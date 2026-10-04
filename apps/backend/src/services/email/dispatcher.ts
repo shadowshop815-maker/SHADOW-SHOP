@@ -32,20 +32,25 @@ import { prisma } from "../../config/db.js";
 // Override prisma locally as any to avoid type errors
 const db = prisma as any;
 
+import { env } from "../../config/env.js";
+
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.gmail.com",
-  port: Number(process.env.SMTP_PORT) || 465,
-  secure: process.env.SMTP_SECURE !== "false", // true for 465, false for other ports
+  host: env.SMTP_HOST || "smtp.gmail.com",
+  port: env.SMTP_PORT || 465,
+  secure: env.SMTP_PORT === 465, // true for 465, false for other ports
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD || process.env.SMTP_PASS,
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASSWORD,
   },
+  tls: { rejectUnauthorized: false },
 });
 
 export const processEmailJobs = async () => {
-  // Only process if SMTP credentials are provided
-  if (!process.env.SMTP_USER || !(process.env.SMTP_PASSWORD || process.env.SMTP_PASS)) {
-    console.log("[Email Dispatcher] SMTP credentials missing. Skipping jobs.");
+  // Only process if an email provider is configured
+  const canSendSmtp = env.EMAIL_PROVIDER === "smtp" && env.SMTP_USER && env.SMTP_PASSWORD;
+  const canSendResend = env.EMAIL_PROVIDER === "resend" && env.RESEND_API_KEY;
+  if (!canSendSmtp && !canSendResend) {
+    console.log("[Email Dispatcher] Email credentials missing. Skipping jobs.");
     return;
   }
 
@@ -87,12 +92,32 @@ export const processEmailJobs = async () => {
         throw new Error("No recipients defined or invalid recipient address");
       }
 
-      await transporter.sendMail({
-        from: `"SHADOW SHOP" <${process.env.SMTP_USER}>`,
-        to: job.recipient,
-        subject,
-        html
-      });
+      if (env.EMAIL_PROVIDER === "resend" && env.RESEND_API_KEY) {
+        const resendRes = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "Shadow Shop <onboarding@resend.dev>",
+            to: job.recipient,
+            subject,
+            html,
+          }),
+        });
+        if (!resendRes.ok) {
+          const body = await resendRes.text().catch(() => "");
+          throw new Error(`Resend API Error: ${resendRes.status} ${body}`);
+        }
+      } else {
+        await transporter.sendMail({
+          from: `"SHADOW SHOP" <${env.SMTP_FROM || env.SMTP_USER}>`,
+          to: job.recipient,
+          subject,
+          html
+        });
+      }
 
       // Mark as SENT
       await db.emailJob.update({

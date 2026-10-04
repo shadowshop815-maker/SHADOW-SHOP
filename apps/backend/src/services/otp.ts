@@ -67,6 +67,56 @@ async function sendSmtpEmail(destination: string, purpose: string, code: string)
   ]);
 }
 
+async function sendResendEmail(destination: string, purpose: string, code: string) {
+  const purposeLabel: Record<string, string> = {
+    REGISTRATION: "Account Verification",
+    EMAIL_VERIFICATION: "Email Verification",
+    PASSWORD_RESET: "Password Reset",
+    PHONE_VERIFICATION: "Phone Verification",
+  };
+
+  const label = purposeLabel[purpose] || "Verification";
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.RESEND_API_KEY}`,
+    },
+    body: JSON.stringify({
+      from: "Shadow Shop <onboarding@resend.dev>", // Free tier requires this
+      to: destination,
+      subject: `Your SHADOW SHOP ${label} Code: ${code}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #0a0a0f; color: #ffffff; border-radius: 12px; overflow: hidden;">
+          <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); padding: 32px 40px; text-align: center; border-bottom: 1px solid #2a2a3e;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 0.1em; color: #ffffff;">SHADOW SHOP</h1>
+          </div>
+          <div style="padding: 40px;">
+            <p style="color: #a0a0b0; font-size: 14px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.1em;">${label}</p>
+            <h2 style="color: #ffffff; font-size: 20px; margin: 0 0 24px;">Your verification code</h2>
+            <div style="background: #1a1a2e; border: 1px solid #2a2a4e; border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+              <span style="font-size: 40px; font-weight: 800; letter-spacing: 0.3em; color: #f0c040; font-family: monospace;">${code}</span>
+            </div>
+            <p style="color: #a0a0b0; font-size: 13px; line-height: 1.6;">
+              This code expires in <strong style="color: #fff;">${env.OTP_EXPIRY_MINUTES} minutes</strong>. 
+              Do not share this code with anyone.
+            </p>
+          </div>
+          <div style="background: #0d0d18; padding: 20px 40px; text-align: center; border-top: 1px solid #1a1a2e;">
+            <p style="color: #606070; font-size: 12px; margin: 0;">© ${new Date().getFullYear()} SHADOW SHOP. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "");
+    throw new Error(`Resend API Error: ${response.status} ${errorBody}`);
+  }
+}
+
 async function deliver(destination: string, purpose: string, code: string) {
   const isEmail = destination.includes("@");
 
@@ -80,6 +130,19 @@ async function deliver(destination: string, purpose: string, code: string) {
     console.log(`  OTP Code   : ${code}`);
     console.log(`  Expires In : ${env.OTP_EXPIRY_MINUTES} minutes`);
     console.log(`================================================================\n`);
+  }
+
+  // Try Resend email delivery (HTTP based, bypasses Render SMTP block)
+  if (isEmail && env.EMAIL_PROVIDER === "resend" && env.RESEND_API_KEY) {
+    try {
+      await sendResendEmail(destination, purpose, code);
+      console.log(`[OTP] Email sent via Resend API to ${mask(destination)}`);
+      return;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[OTP] Resend delivery failed: ${msg}`);
+      throw new AppError(502, "We could not send the verification email. Please try again.", "OTP_DELIVERY_FAILED");
+    }
   }
 
   // Try SMTP email delivery
