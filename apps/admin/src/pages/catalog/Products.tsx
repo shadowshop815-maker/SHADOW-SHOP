@@ -240,7 +240,7 @@ export function Products() {
                     <tr key={p.id}>
                       <td>
                         <div className="product-cell">
-                          <img src={p.thumbnail || "http://localhost:3000/assets/product-fallback.svg"} alt="" />
+                          <img src={p.thumbnail || `${import.meta.env.VITE_CUSTOMER_URL || "http://localhost:3000"}/assets/product-fallback.svg`} alt="" />
                           <b>{p.name}</b>
                         </div>
                       </td>

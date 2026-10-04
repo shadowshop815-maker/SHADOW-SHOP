@@ -82,7 +82,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <b>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</b>
           </div>
           <div className="top-actions">
-            <a className="store-link" href="http://localhost:3000" target="_blank" rel="noreferrer">View store ↗</a>
+            <a className="store-link" href={import.meta.env.VITE_CUSTOMER_URL || "http://localhost:3000"} target="_blank" rel="noreferrer">View store ↗</a>
             <button onClick={() => setDark(!dark)} aria-label="Toggle color theme">{dark ? <Sun /> : <Moon />}</button>
             <span className="avatar">{auth.user?.name.slice(0, 2).toUpperCase()}</span>
             <button onClick={auth.logout} aria-label="Sign out"><LogOut /></button>

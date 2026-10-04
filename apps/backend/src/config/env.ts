@@ -22,7 +22,7 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32),
   CUSTOMER_URL: z.string().url().default("http://localhost:3000"),
   ADMIN_URL: z.string().url().default("http://localhost:3001"),
-  BACKEND_URL: z.string().url().default("http://localhost:5000"),
+  BACKEND_URL: z.string().url().default(process.env.RENDER_EXTERNAL_URL || "http://localhost:5000"),
   OTP_EXPIRY_MINUTES: z.coerce.number().positive().default(5),
   OTP_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().nonnegative().default(60),
