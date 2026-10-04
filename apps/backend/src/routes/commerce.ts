@@ -274,8 +274,8 @@ commerceRouter.post("/checkout", optionalAuth, asyncHandler(async (req, res) => 
   if (!req.auth && !input.guest) throw new AppError(400, "Guest contact details are required.", "GUEST_DETAILS_REQUIRED");
   const prior = await prisma.order.findUnique({ where: { idempotencyKey: input.idempotencyKey }, include: { items: true } }); if (prior) return success(res, "Order already placed.", prior);
   // FIXED: Include categories so OfferEngine can evaluate category-based product rules
-  const products = await prisma.product.findMany({ where: { id: { in: input.items.map((item) => item.productId) } }, include: { images: { orderBy: { position: "asc" } }, categories: true } });
-  if (products.length !== new Set(input.items.map((item) => item.productId)).size) throw new AppError(400, "One or more products no longer exist.", "PRODUCT_UNAVAILABLE");
+  const products = await prisma.product.findMany({ where: { id: { in: input.items.map((item: any) => item.productId) } }, include: { images: { orderBy: { position: "asc" } }, categories: true } });
+  if (products.length !== new Set(input.items.map((item: any) => item.productId)).size) throw new AppError(400, "One or more products no longer exist.", "PRODUCT_UNAVAILABLE");
   let settings = await prisma.storeSettings.findUnique({ where: { id: 1 } });
   if (!settings) settings = await prisma.storeSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } }); 
   const taxRate = settings.taxRate / 100;
