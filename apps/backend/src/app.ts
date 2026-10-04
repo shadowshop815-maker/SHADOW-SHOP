@@ -110,7 +110,18 @@ app.use(helmet({
   referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
 
-app.use(cors({ origin: [env.CUSTOMER_URL, env.ADMIN_URL], credentials: false, methods: ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"] }));
+app.use(cors({ 
+  origin: [
+    env.CUSTOMER_URL, 
+    env.ADMIN_URL, 
+    "https://shadowshop-82930.web.app", 
+    "https://shadowshop-82930-admin.web.app",
+    "http://localhost:3000",
+    "http://localhost:3001"
+  ], 
+  credentials: false, 
+  methods: ["GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"] 
+}));
 
 // Global Rate Limiter (Protects against generic DDoS/Brute-forcing)
 const globalLimiter = rateLimit({ 
