@@ -1,0 +1,20 @@
+{
+  "name": "shadow-shop",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "banner": "node scripts/dev-banner.mjs",
+    "dev": "npm run banner && concurrently -n BACKEND,CUSTOMER,ADMIN -c yellow,cyan,magenta \"npm run dev -w @shadow/backend\" \"npm run dev -w @shadow/customer\" \"npm run dev -w @shadow/admin\"",
+    "build": "npm run build -w @shadow/shared && npm run build -w @shadow/backend && npm run build -w @shadow/customer && npm run build -w @shadow/admin",
+    "test": "npm run test -w @shadow/backend",
+    "db:migrate": "npm run db:migrate -w @shadow/backend",
+    "db:seed": "npm run db:seed -w @shadow/backend",
+    "db:studio": "npm run db:studio -w @shadow/backend",
+    "db:validate": "npm run db:validate -w @shadow/backend",
+    "clear-demo": "tsx scripts/clear-demo.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

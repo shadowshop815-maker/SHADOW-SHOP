@@ -1,0 +1,19 @@
+{
+  "projects": {
+    "default": "shadowshop-82930",
+    "y": "shadowshop-82930"
+  },
+  "targets": {
+    "shadowshop-82930": {
+      "hosting": {
+        "customer": [
+          "shadowshop-82930"
+        ],
+        "admin": [
+          "shadowshop-82930-admin"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

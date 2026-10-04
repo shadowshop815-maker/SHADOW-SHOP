@@ -1,0 +1,758 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id               String             @id @default(uuid())
+  name             String
+  email            String             @unique
+  phone            String?            @unique
+  passwordHash     String
+  role             String             @default("CUSTOMER")
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
+  lastLoginAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  customerProfile  CustomerProfile?
+  adminProfile     AdminProfile?
+  addresses        Address[]
+  carts            Cart[]
+  orders           Order[]
+  moderation       ModerationAction[] @relation("ModeratedUser")
+  moderatorActions ModerationAction[] @relation("Moderator")
+  auditLogs        AdminAuditLog[]
+  offerRedemptions OfferRedemption[]
+
+  @@index([role])
+}
+
+model CustomerProfile {
+  id         String         @id @default(uuid())
+  userId     String         @unique
+  status     String         @default("ACTIVE")
+  banReason  String?
+  banExpires DateTime?
+  adminNotes String?
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminProfile {
+  id       String @id @default(uuid())
+  userId   String @unique
+  jobTitle String @default("Administrator")
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Address {
+  id               String   @id @default(uuid())
+  userId           String
+  fullName         String
+  phone            String
+  line1            String
+  line2            String   @default("")
+  landmark         String   @default("")
+  town             String
+  city             String
+  district         String
+  state            String
+  pinCode          String
+  country          String
+  latitude         Float?
+  longitude        Float?
+  formattedAddress String?
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders           Order[]
+
+  @@index([userId, isDefault])
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String    @default("")
+  image       String    @default("")
+  active          Boolean   @default(true)
+  returnWindowMins Int?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  products        Product[]
+  offerRules  OfferCategoryRule[]
+}
+
+model Product {
+  id                String              @id @default(uuid())
+  slug              String              @unique
+  name              String
+  shortDescription  String              @default("")
+  description       String
+  brand             String              @default("SHADOW SHOP")
+  sku               String              @unique
+  price             Decimal
+  salePrice         Decimal?
+  costPrice         Decimal?
+  stock             Int                 @default(0)
+  lowStockThreshold Int                 @default(5)
+  status            String              @default("DRAFT")
+  featured          Boolean             @default(false)
+  thumbnail         String              @default("")
+  sizes             String              @default("[]")
+  colors            String              @default("[]")
+  tags              String              @default("[]")
+  weight            Float?
+  shippingInfo      String              @default("")
+  returnPolicy      String              @default("")
+  isReturnable      Boolean             @default(true)
+  returnWindowMins  Int?
+
+  hsnCode           String?
+  taxProfileId      String?
+  taxMode           String              @default("INCLUSIVE")
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  categories        Category[]
+  images            ProductImage[]
+  variants          ProductVariant[]
+  cartItems         CartItem[]
+  orderItems        OrderItem[]
+  inventory         InventoryMovement[]
+  offerRules        OfferProductRule[]
+  taxProfile        TaxProfile?         @relation(fields: [taxProfileId], references: [id])
+
+  @@index([status, featured])
+
+  @@index([createdAt])
+}
+
+model ProductImage {
+  id        String  @id @default(uuid())
+  productId String
+  url       String
+  alt       String  @default("")
+  position  Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String
+  size      String?
+  color     String?
+  sku       String  @unique
+  stock        Int     @default(0)
+  
+  price        Decimal?
+  salePrice    Decimal?
+  hsnCode      String?
+  taxProfileId String?
+  taxMode      String?
+
+  product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  taxProfile   TaxProfile? @relation("ProductVariantToTaxProfile", fields: [taxProfileId], references: [id])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String?
+  guestKey  String?    @unique
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  appliedOfferCode  String?
+  deliveryAddressId String?
+  deliveryOptionId  String?
+  deliveryOption    DeliveryOption? @relation(fields: [deliveryOptionId], references: [id])
+  user              User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@index([userId])
+}
+
+model CartItem {
+  id            String  @id @default(uuid())
+  cartId        String
+  productId     String
+  quantity      Int
+  selectedSize  String  @default("")
+  selectedColor String  @default("")
+  cart          Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product       Product @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId, selectedSize, selectedColor])
+}
+
+model Order {
+  id                      String                @id @default(uuid())
+  orderNumber             String                @unique
+  customerId              String?
+  addressId               String?
+  guestName               String?
+  guestEmail              String?
+  guestPhone              String?
+  idempotencyKey          String                @unique
+  subtotal                Decimal
+  discount                Decimal               @default(0)
+  shippingCharge          Decimal
+  tax                     Decimal
+  
+  cgstTotal               Decimal               @default(0)
+  sgstTotal               Decimal               @default(0)
+  igstTotal               Decimal               @default(0)
+  cessTotal               Decimal               @default(0)
+  taxableTotal            Decimal               @default(0)
+  placeOfSupplyState      String?
+
+  grandTotal              Decimal
+  shippingAddressSnapshot String                @default("{}")
+  deliverySnapshot        String                @default("{}") // Stores the selected delivery option details
+  // === SHIPPING BREAKDOWN SNAPSHOT (immutable after order creation) ===
+  baseShippingFeeSnapshot Decimal               @default(0)  // Base fee at time of order
+  freeShippingDiscountSnapshot Decimal          @default(0)  // Amount waived by free-shipping rule
+  speedSurchargeSnapshot  Decimal               @default(0)  // Delivery speed upgrade fee
+  finalShippingFeeSnapshot Decimal              @default(0)  // Actual shipping charged
+  freeShippingThresholdSnapshot Decimal?                     // Threshold value at time of order
+  paymentMethod           String
+  paymentStatus           String                @default("PENDING")
+  orderStatus             String                @default("PENDING")
+  trackingNumber          String?
+  courierName             String?
+  customerNote            String?
+  adminNote               String?
+  stockRestored           Boolean               @default(false)
+  deliveredAt             DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  customer                User?                 @relation(fields: [customerId], references: [id])
+  address                 Address?              @relation(fields: [addressId], references: [id])
+  items                   OrderItem[]
+  cancellation            CancellationRequest?
+  returns                 ReturnRequest[]
+  refunds                 Refund[]
+  offerRedemptions        OfferRedemption[]
+
+  @@index([customerId, createdAt])
+  @@index([orderStatus, createdAt])
+}
+
+model OrderItem {
+  id                   String       @id @default(uuid())
+  orderId              String
+  productId            String
+  productNameSnapshot  String
+  productImageSnapshot String
+  selectedSize         String       @default("")
+  selectedColor        String       @default("")
+  quantity             Int
+  unitPriceSnapshot    Decimal
+  discountSnapshot     Decimal      @default(0)
+  
+  hsnSnapshot          String?
+  taxableValue         Decimal      @default(0)
+  cgstRateSnapshot     Float        @default(0)
+  sgstRateSnapshot     Float        @default(0)
+  igstRateSnapshot     Float        @default(0)
+  cessRateSnapshot     Float        @default(0)
+  cgstAmount           Decimal      @default(0)
+  sgstAmount           Decimal      @default(0)
+  igstAmount           Decimal      @default(0)
+  cessAmount           Decimal      @default(0)
+  totalTax             Decimal      @default(0)
+  finalLineAmount      Decimal      @default(0)
+
+  itemStatus           String       @default("PENDING")
+  deliveredAt          DateTime?
+  returnDeadline       DateTime?
+  returnPolicySnapshot String?
+  order                Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product              Product      @relation(fields: [productId], references: [id])
+  returnItems          ReturnItem[]
+}
+
+model CancellationRequest {
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  reason        String
+  status        String        @default("REQUESTED")
+  adminResponse String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+}
+
+model ReturnRequest {
+  id            String       @id @default(uuid())
+  returnNumber  String       @unique
+  orderId       String
+  reason        String
+  description   String
+  evidence      String       @default("[]")
+  status        String       @default("RETURN_REQUESTED")
+  resolution    String?
+  upiId         String?
+  adminResponse String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items         ReturnItem[]
+  refunds       Refund[]
+  history       ReturnStatusHistory[]
+
+  @@index([status, createdAt])
+}
+
+model ReturnStatusHistory {
+  id              String        @id @default(uuid())
+  returnRequestId String
+  status          String
+  actorType       String        @default("SYSTEM")
+  actorId         String?
+  note            String?
+  createdAt       DateTime      @default(now())
+
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  @@index([returnRequestId, createdAt])
+}
+
+model ReturnItem {
+  id              String        @id @default(uuid())
+  returnRequestId String
+  orderItemId     String
+  quantity        Int
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+
+  @@unique([returnRequestId, orderItemId])
+}
+
+model Refund {
+  id              String         @id @default(uuid())
+  orderId         String
+  returnRequestId String?
+  amount          Decimal
+  status          String         @default("CREATED")
+  reference       String?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  order           Order          @relation(fields: [orderId], references: [id])
+  returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model InventoryMovement {
+  id        String                @id @default(uuid())
+  productId String
+  type      String
+  quantity  Int
+  before    Int
+  after     Int
+  reason    String
+  reference String?
+  createdAt DateTime              @default(now())
+  product   Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+}
+
+model OTPVerification {
+  id          String     @id @default(uuid())
+  destination String
+  purpose     String
+  codeHash    String
+  attempts    Int        @default(0)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime   @default(now())
+
+  @@index([destination, purpose, createdAt])
+}
+
+model UpdatePost {
+  id          String        @id @default(uuid())
+  title       String
+  slug        String        @unique
+  description String
+  coverImage  String        @default("")
+  category    String        @default("News")
+  publishDate DateTime?
+  status      String        @default("DRAFT")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status, publishDate])
+}
+
+model MediaItem {
+  id          String        @id @default(uuid())
+  title       String
+  description String        @default("")
+  type        String
+  url         String
+  thumbnail   String        @default("")
+  status      String        @default("DRAFT")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model Enquiry {
+  id           String        @id @default(uuid())
+  name         String
+  email        String
+  phone        String?
+  subject      String
+  message      String
+  status       String        @default("UNREAD")
+  internalNote String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([status, createdAt])
+}
+
+model NewsletterSubscriber {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  subscribedAt DateTime @default(now())
+  active       Boolean  @default(true)
+}
+
+model StoreSettings {
+  id                    Int      @id @default(1)
+  email                 String   @default("")
+  phone                 String   @default("")
+  whatsapp              String   @default("")
+  whatsappMessage       String   @default("Hello SHADOW SHOP, I would like to make an enquiry.")
+  whatsappEnabled       Boolean  @default(true)
+  currency              String   @default("INR")
+  
+  adminNotificationEmails String @default("[]") // Array of admin emails for alerts
+  adminAlertsEnabled    Boolean  @default(true)
+  
+  gstRegistered         Boolean  @default(false)
+  gstin                 String   @default("")
+  supplierState         String   @default("West Bengal")
+  
+  taxRate                 Float    @default(0)
+  shippingCharge          Decimal  @default(0) // Legacy
+  standardDeliveryName    String   @default("Standard Delivery (3-7 business days)")
+  standardDeliveryCharge  Decimal  @default(0)
+  expressDeliveryEnabled  Boolean  @default(true)
+  expressDeliveryName     String   @default("Express Delivery (1-2 business days)")
+  expressDeliveryCharge   Decimal  @default(100)
+  freeShippingThreshold   Decimal?
+  returnsEnabled        Boolean  @default(true)
+  returnWindowMinutes   Int      @default(10)
+  requireReturnReason   Boolean  @default(true)
+  allowReturnComment    Boolean  @default(true)
+  requirePhotoForDamage Boolean  @default(true)
+  allowPartialReturns   Boolean  @default(true)
+  allowedReturnResolutions String @default("[\"REFUND\", \"REPLACEMENT\"]")
+  returnExpiredMessage  String   @default("Return period has ended. Enjoy your product!")
+  cancellationPolicy    String   @default("")
+  returnPolicy          String   @default("")
+  privacyPolicy         String   @default("")
+  terms                 String   @default("")
+  socialProfiles        String   @default("{}")
+  isOpen                Boolean  @default(true)
+  updatedAt             DateTime @updatedAt
+}
+
+model BrandingSettings {
+  id                  Int      @id @default(1)
+  storeName           String   @default("SHADOW SHOP")
+  logo                String   @default("")
+  headerLogo          String   @default("")
+  footerLogo          String   @default("")
+  favicon             String   @default("")
+  tagline             String   @default("Own the shadow. Define the style.")
+  storeDescription    String   @default("")
+  heroHeading         String   @default("Style that follows no one")
+  heroSubheading      String   @default("Discover premium essentials curated for a bold, modern wardrobe.")
+  heroImage           String   @default("")
+  heroButtonText      String   @default("Shop the collection")
+  heroButtonLink      String   @default("/products")
+  promotionalBanner   String   @default("")
+  newsletterHeading   String   @default("Enter the inner circle")
+  newsletterText      String   @default("New drops, private offers and stories from SHADOW SHOP.")
+  updatedAt           DateTime @updatedAt
+}
+
+model LocationSettings {
+  id           Int      @id @default(1)
+  branchName   String   @default("SHADOW SHOP")
+  line1        String   @default("")
+  line2        String   @default("")
+  landmark     String   @default("")
+  city         String   @default("")
+  district     String   @default("")
+  state        String   @default("")
+  country      String   @default("India")
+  pinCode      String   @default("")
+  latitude     Float?
+  longitude    Float?
+  mapsUrl      String   @default("")
+  placeId      String   @default("")
+  updatedAt    DateTime @updatedAt
+}
+
+model SecuritySettings {
+  id                       Int      @id @default(1)
+  otpExpiryMinutes         Int      @default(5)
+  otpMaxAttempts           Int      @default(5)
+  otpResendCooldownSeconds Int      @default(60)
+  requireEmailVerification Boolean  @default(false)
+  updatedAt                DateTime @updatedAt
+}
+
+model ModerationAction {
+  id          String         @id @default(uuid())
+  customerId  String
+  adminId     String
+  previous    String
+  next        String
+  reason      String
+  note        String?
+  expiresAt   DateTime?
+  createdAt   DateTime       @default(now())
+  customer    User           @relation("ModeratedUser", fields: [customerId], references: [id])
+  admin       User           @relation("Moderator", fields: [adminId], references: [id])
+
+  @@index([customerId, createdAt])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  action     String
+  entityType String
+  entityId   String?
+  metadata   String   @default("{}")
+  timestamp  DateTime @default(now())
+  admin      User     @relation(fields: [adminId], references: [id])
+
+  @@index([timestamp])
+  @@index([entityType, entityId])
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  name      String
+  latitude  Float
+  longitude Float
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  locationRules OfferLocationRule[]
+  redemptions   OfferRedemption[]
+}
+
+model Offer {
+  id                String    @id @default(uuid())
+  name              String
+  internalName      String?
+  description       String?
+  code              String    @unique
+  type              String    @default("AUTOMATIC")
+  discountType      String    @default("FIXED")
+  discountValue     Decimal
+  maxDiscountAmount Decimal?
+  minOrderAmount    Decimal?
+  maxOrderAmount    Decimal?
+  status            String    @default("DRAFT")
+  startsAt          DateTime?
+  endsAt            DateTime?
+  usageLimit        Int?
+  perCustomerLimit  Int?
+  stackable         Boolean   @default(false)
+  priority          Int       @default(0)
+  
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  locationRules     OfferLocationRule[]
+  productRules      OfferProductRule[]
+  categoryRules     OfferCategoryRule[]
+  redemptions       OfferRedemption[]
+}
+
+model OfferLocationRule {
+  id              String   @id @default(uuid())
+  offerId         String
+  storeId         String
+  radiusKm        Float
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  
+  offer           Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  store           Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, storeId])
+}
+
+model OfferProductRule {
+  id              String   @id @default(uuid())
+  offerId         String
+  productId       String
+  isExclusion     Boolean  @default(false)
+  
+  offer           Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, productId])
+}
+
+model OfferCategoryRule {
+  id              String   @id @default(uuid())
+  offerId         String
+  categoryId      String
+  isExclusion     Boolean  @default(false)
+  
+  offer           Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, categoryId])
+}
+
+model OfferRedemption {
+  id                   String   @id @default(uuid())
+  offerId              String
+  orderId              String
+  userId               String?
+  
+  offerCode            String
+  offerName            String
+  discountType         String
+  discountValue        Decimal
+  actualDiscountAmount Decimal
+  maximumDistanceKm    Float?
+  actualDistanceKm     Float?
+  storeId              String?
+  deliveryAddressId    String?
+  eligibilityResult    String   @default("{}")
+  
+  createdAt            DateTime @default(now())
+  
+  offer                Offer    @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  order                Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  store                Store?   @relation(fields: [storeId], references: [id], onDelete: SetNull)
+
+  @@index([offerId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model DeliveryOption {
+  id                 String    @id @default(uuid())
+  name               String
+  internalName       String
+  description        String    @default("")
+  deliveryType       String    @default("Standard")
+  deliveryDays       Int
+  dayCalculationType String    @default("BUSINESS_DAYS") // BUSINESS_DAYS or CALENDAR_DAYS
+  price              Decimal   @default(0) // Legacy field kept for DB compat — use speedSurcharge
+  speedSurcharge     Decimal   @default(0) // The extra fee for this speed tier above base shipping
+  freeDelivery       Boolean   @default(false) // Legacy — prefer global free shipping threshold
+  freeAboveAmount    Decimal?  // Legacy per-option threshold — prefer DeliverySettings.freeShippingThreshold
+  maxDistanceKm      Float?
+  status             String    @default("ACTIVE")
+  priority           String    @default("NORMAL")
+  isDefault          Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  cartSelections     Cart[]
+}
+
+model DeliveryHoliday {
+  id        String   @id @default(uuid())
+  date      DateTime @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DeliverySettings {
+  id                  Int      @id @default(1)
+  enableSelection     Boolean  @default(true)
+  orderCutoffTime     String   @default("14:00")
+  workingDays         String   @default("[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\",\"Saturday\"]")
+  timezone            String   @default("Asia/Kolkata")
+  
+  // === BASE SHIPPING PRICING ===
+  baseShippingFee     Decimal  @default(0)    // Standard base fee before free-shipping waiver
+  freeShippingEnabled Boolean  @default(false) // Master toggle for free shipping threshold
+  freeShippingThreshold Decimal @default(500) // Cart value at/above which base shipping is waived
+  freeShippingBasis   String   @default("AFTER_DISCOUNT") // BEFORE_DISCOUNT | AFTER_DISCOUNT
+  
+  updatedAt           DateTime @updatedAt
+}
+
+model TaxProfile {
+  id              String       @id @default(uuid())
+  name            String       
+  code            String       @unique 
+  description     String       @default("")
+  rate            Float        
+  cgstComponent   Float        
+  sgstComponent   Float        
+  igstComponent   Float        
+  cessComponent   Float        @default(0)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  products        Product[]
+  productVariants ProductVariant[] @relation("ProductVariantToTaxProfile")
+  hsnMappings     HSNMaster[]
+}
+
+model HSNMaster {
+  id              String       @id @default(uuid())
+  hsnCode         String       @unique
+  description     String
+  taxProfileId    String?
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  taxProfile      TaxProfile?  @relation(fields: [taxProfileId], references: [id])
+}
+
+model EmailJob {
+  id              String    @id @default(uuid())
+  eventType       String
+  recipient       String
+  templateId      String
+  payload         String    // JSON stringified payload
+  idempotencyKey  String    @unique
+  status          String    @default("PENDING") // PENDING, PROCESSING, SENT, FAILED
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(5)
+  lastError       String?
+  scheduledAt     DateTime  @default(now())
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([status, scheduledAt])
+  @@index([idempotencyKey])
+}

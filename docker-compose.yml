@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shadow_shop
+      POSTGRES_USER: shadow
+      POSTGRES_PASSWORD: shadow_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - shadow_shop_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shadow -d shadow_shop"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  shadow_shop_postgres:
