@@ -158,13 +158,26 @@ adminReturnsRouter.patch("/:id/status", asyncHandler(async (req, res) => {
       });
     }
     
-    // Enqueue emails for return flow
+    // Enqueue emails for return flow — deterministic keys prevent duplicate sends
     const orderForEmail = await tx.order.findUnique({ where: { id: ret.orderId }, include: { customer: true } });
     if (orderForEmail) {
       const toEmail = orderForEmail.guestEmail || orderForEmail.customer?.email;
       if (toEmail) {
-        if (next === "PICKUP_SCHEDULED") await enqueueEmailJob(tx, "PICKUP_SCHEDULED", toEmail, "return_pickup_scheduled", { ...updatedRet, orderNumber: orderForEmail.orderNumber });
-        if (next === "REFUND_COMPLETED") await enqueueEmailJob(tx, "REFUND_COMPLETED", toEmail, "return_refund_completed", { ...updatedRet, orderNumber: orderForEmail.orderNumber });
+        const emailPayload = {
+          ...updatedRet,
+          orderNumber: orderForEmail.orderNumber,
+          customerName: orderForEmail.guestName || orderForEmail.customer?.name || "Customer",
+          orderId: ret.orderId,
+        };
+        const iKey = (event: string) => `${event}_${ret.id}`;
+
+        if (next === "RETURN_APPROVED")    await enqueueEmailJob(tx, "RETURN_APPROVED",          toEmail, "return_approved",          emailPayload, iKey("RETURN_APPROVED"));
+        if (next === "RETURN_REJECTED")    await enqueueEmailJob(tx, "RETURN_REJECTED",          toEmail, "return_rejected",          emailPayload, iKey("RETURN_REJECTED"));
+        if (next === "PICKUP_SCHEDULED")   await enqueueEmailJob(tx, "PICKUP_SCHEDULED",         toEmail, "return_pickup_scheduled",  emailPayload, iKey("PICKUP_SCHEDULED"));
+        if (next === "PICKED_UP")          await enqueueEmailJob(tx, "PICKED_UP",                toEmail, "return_picked_up",         emailPayload, iKey("PICKED_UP"));
+        if (next === "RETURN_RECEIVED")    await enqueueEmailJob(tx, "RETURN_RECEIVED",          toEmail, "return_received",          emailPayload, iKey("RETURN_RECEIVED"));
+        if (next === "REFUND_INITIATED")   await enqueueEmailJob(tx, "REFUND_INITIATED",         toEmail, "refund_initiated",         emailPayload, iKey("REFUND_INITIATED"));
+        if (next === "REFUND_COMPLETED")   await enqueueEmailJob(tx, "REFUND_COMPLETED",         toEmail, "return_refund_completed",  emailPayload, iKey("REFUND_COMPLETED"));
       }
     }
 

@@ -164,7 +164,8 @@ adminRouter.patch("/orders/:id/status", asyncHandler(async (req, res) => {
       } 
     }); 
 
-    // Enqueue transactional emails
+    // Enqueue transactional emails for order status changes
+    // Use deterministic idempotency keys to prevent duplicate emails on retries
     let toEmail = updatedOrder.guestEmail;
     if (!toEmail && updatedOrder.customerId) {
       const user = await tx.user.findUnique({ where: { id: updatedOrder.customerId } });
@@ -172,9 +173,19 @@ adminRouter.patch("/orders/:id/status", asyncHandler(async (req, res) => {
     }
 
     if (toEmail) {
-      if (next === "SHIPPED") await enqueueEmailJob(tx, "ORDER_SHIPPED", toEmail, "order_shipped", updatedOrder);
-      if (next === "DELIVERED") await enqueueEmailJob(tx, "ORDER_DELIVERED", toEmail, "order_delivered", updatedOrder);
-      if (next === "CANCELLED") await enqueueEmailJob(tx, "ORDER_CANCELLED", toEmail, "order_cancelled", updatedOrder);
+      const emailPayload = {
+        ...updatedOrder,
+        customerName: updatedOrder.guestName,
+        customerEmail: updatedOrder.guestEmail,
+      };
+      const iKey = (event: string) => `${event}_${updatedOrder.id}`;
+      if (next === "CONFIRMED")         await enqueueEmailJob(tx, "ORDER_CONFIRMED",         toEmail, "order_confirmed",         emailPayload, iKey("ORDER_CONFIRMED"));
+      if (next === "PROCESSING")        await enqueueEmailJob(tx, "ORDER_PROCESSING",        toEmail, "order_processing",        emailPayload, iKey("ORDER_PROCESSING"));
+      if (next === "PACKED")            await enqueueEmailJob(tx, "ORDER_PACKED",            toEmail, "order_packed",            emailPayload, iKey("ORDER_PACKED"));
+      if (next === "SHIPPED")           await enqueueEmailJob(tx, "ORDER_SHIPPED",           toEmail, "order_shipped",           emailPayload, iKey("ORDER_SHIPPED"));
+      if (next === "OUT_FOR_DELIVERY")  await enqueueEmailJob(tx, "ORDER_OUT_FOR_DELIVERY",  toEmail, "order_out_for_delivery",  emailPayload, iKey("ORDER_OUT_FOR_DELIVERY"));
+      if (next === "DELIVERED")         await enqueueEmailJob(tx, "ORDER_DELIVERED",         toEmail, "order_delivered",         emailPayload, iKey("ORDER_DELIVERED"));
+      if (next === "CANCELLED")         await enqueueEmailJob(tx, "ORDER_CANCELLED",         toEmail, "order_cancelled",         emailPayload, iKey("ORDER_CANCELLED"));
     }
     
     return updatedOrder;
@@ -500,4 +511,94 @@ adminRouter.get("/email-logs", asyncHandler(async (req, res) => {
     prisma.emailJob.count({ where: filter })
   ]);
   return success(res, "Email logs loaded.", paged(items, total, page, limit));
+}));
+
+// ─── Email System Diagnostics ────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/admin/email/status
+ * Returns the current email system configuration status for the admin diagnostics UI.
+ * Never exposes secret values — only YES/NO flags and safe display strings.
+ */
+adminRouter.get("/email/status", asyncHandler(async (_req, res) => {
+  const provider = env.EMAIL_PROVIDER || "none";
+  const apiKeyConfigured = provider === "resend" ? Boolean(env.RESEND_API_KEY) : false;
+  const adminConfigured = Boolean(env.ADMIN_EMAIL);
+
+  // Fetch last email job for display
+  const lastJob = await prisma.emailJob.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { status: true, templateId: true, lastError: true, sentAt: true, createdAt: true },
+  }).catch(() => null);
+
+  return success(res, "Email status loaded.", {
+    provider,
+    apiKeyConfigured,
+    fromAddress: env.EMAIL_FROM || null,
+    fromName: env.EMAIL_FROM_NAME || "SHADOW SHOP",
+    adminEmailConfigured: adminConfigured,
+    lastJob: lastJob
+      ? {
+          status: lastJob.status,
+          templateId: lastJob.templateId,
+          lastError: lastJob.lastError || null,
+          sentAt: lastJob.sentAt,
+          createdAt: lastJob.createdAt,
+        }
+      : null,
+  });
+}));
+
+/**
+ * POST /api/v1/admin/email/test
+ * Sends a test email through the configured email provider.
+ * Admin-only, rate-limited by the global 300/min admin rate limiter.
+ */
+adminRouter.post("/email/test", asyncHandler(async (req, res) => {
+  // Lazy-import to avoid circular dependency issues at module load time
+  const { sendEmail } = await import("../services/email/emailService.js");
+  const { generateEmailHtml, generateEmailText } = await import("../services/email/emailTemplates.js");
+
+  const rawEmail = String(req.body.email || env.EMAIL_TEST_TO || env.ADMIN_EMAIL || "").trim().toLowerCase();
+
+  if (!rawEmail || !rawEmail.includes("@")) {
+    throw new AppError(400, "A valid email address is required.", "VALIDATION_ERROR");
+  }
+
+  // Extra safety: never relay to arbitrary internet addresses (basic domain sanity)
+  if (rawEmail.length > 254) {
+    throw new AppError(400, "Email address is too long.", "VALIDATION_ERROR");
+  }
+
+  console.log(`[Admin] Email test requested by admin ${req.auth!.id} → ${rawEmail[0]}***@${rawEmail.split("@")[1]}`);
+
+  const html = generateEmailHtml("email_system_test", {});
+  const text = generateEmailText("email_system_test", {});
+
+  const result = await sendEmail({
+    to: rawEmail,
+    subject: "SHADOW SHOP Email System Test",
+    html,
+    text,
+    tags: [{ name: "type", value: "admin_test" }],
+  });
+
+  if (!result.success) {
+    return res.status(502).json({
+      success: false,
+      message: "Email send failed. Check logs for details.",
+      provider: result.provider,
+      error: result.error,
+    });
+  }
+
+  await audit(req.auth!.id, "EMAIL_TEST_SENT", "EmailSystem", rawEmail, {
+    provider: result.provider,
+    messageId: result.messageId || "n/a",
+  });
+
+  return success(res, "Test email sent successfully.", {
+    provider: result.provider,
+    messageId: result.messageId || null,
+  });
 }));

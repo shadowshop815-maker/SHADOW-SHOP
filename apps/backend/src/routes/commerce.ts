@@ -426,24 +426,64 @@ commerceRouter.post("/checkout", optionalAuth, asyncHandler(async (req, res) => 
     const createdOrder = await tx.order.create({ data: orderData, include: { items: true, offerRedemptions: true } });
     
     // Enqueue order placement emails (Transactional Outbox)
+    // Use deterministic idempotency keys to prevent duplicate sends on retry/restart
     const settings = await tx.storeSettings.findUnique({ where: { id: 1 } });
-    const customerEmail = input.guest?.email || req.auth?.email; // Need to ensure auth email is accessible or fetched. Assuming req.auth.email exists or we fetch it.
-    
+
     let toEmail = input.guest?.email;
+    let toName = input.guest?.name;
     if (!toEmail && req.auth?.id) {
-      const user = await tx.user.findUnique({ where: { id: req.auth.id } });
-      toEmail = user?.email;
+      const userForEmail = await tx.user.findUnique({ where: { id: req.auth.id } });
+      toEmail = userForEmail?.email;
+      toName = userForEmail?.name;
     }
+
+    const emailPayload = {
+      ...createdOrder,
+      customerName: input.guest?.name || toName || "",
+      customerEmail: toEmail,
+      customerPhone: input.guest?.phone,
+    };
 
     if (toEmail) {
-      await enqueueEmailJob(tx, "ORDER_PLACED", toEmail, "order_placed", createdOrder);
+      await enqueueEmailJob(
+        tx,
+        "ORDER_PLACED",
+        toEmail,
+        "order_placed",
+        emailPayload,
+        `ORDER_PLACED_${createdOrder.id}`, // deterministic key — no duplicate on retry
+      );
     }
 
+    // Admin notification: use DB setting first, fall back to ADMIN_EMAIL env var
+    const adminEmails: string[] = [];
     if (settings?.adminAlertsEnabled && settings?.adminNotificationEmails) {
-      const adminEmails = settings.adminNotificationEmails.split(",").map((e: string) => e.trim()).filter(Boolean);
-      for (const adminEmail of adminEmails) {
-        await enqueueEmailJob(tx, "ORDER_PLACED_ADMIN", adminEmail, "admin_new_order_alert", createdOrder);
+      try {
+        // Schema stores as JSON array string: '["a@b.com","b@b.com"]'
+        const parsed = JSON.parse(settings.adminNotificationEmails);
+        if (Array.isArray(parsed)) {
+          adminEmails.push(...parsed.map((e: string) => String(e).trim()).filter(Boolean));
+        }
+      } catch {
+        // Legacy fallback: comma-separated string
+        const dbEmails = settings.adminNotificationEmails.split(",").map((e: string) => e.trim()).filter(Boolean);
+        adminEmails.push(...dbEmails);
       }
+    }
+    // Fallback: always notify ADMIN_EMAIL if set and not already included
+    const envAdminEmail = process.env.ADMIN_EMAIL;
+    if (envAdminEmail && !adminEmails.includes(envAdminEmail)) {
+      adminEmails.push(envAdminEmail);
+    }
+    for (const adminEmail of adminEmails) {
+      await enqueueEmailJob(
+        tx,
+        "ORDER_PLACED_ADMIN",
+        adminEmail,
+        "admin_new_order_alert",
+        emailPayload,
+        `ORDER_PLACED_ADMIN_${createdOrder.id}_${adminEmail}`,
+      );
     }
 
     return createdOrder;
@@ -489,15 +529,57 @@ commerceRouter.post("/orders/:id/returns", requireAuth, asyncHandler(async (req,
     });
     
     await tx.order.update({ where: { id: order.id }, data: { orderStatus: "RETURN_REQUESTED" } });
-    
-    if (settings?.adminAlertsEnabled && settings?.adminNotificationEmails) {
-      const adminEmails = settings.adminNotificationEmails.split(",").map((e: string) => e.trim()).filter(Boolean);
-      for (const adminEmail of adminEmails) {
-        await enqueueEmailJob(tx, "RETURN_REQUESTED_ADMIN", adminEmail, "admin_new_return_alert", {
+
+    // Customer: acknowledge return request
+    const customerEmail = req.auth?.email || order.guestEmail;
+    if (customerEmail) {
+      await enqueueEmailJob(
+        tx,
+        "RETURN_REQUESTED_CUSTOMER",
+        customerEmail,
+        "return_requested",
+        {
           ...created,
-          customerName: order.guestName || "Customer"
-        });
+          customerName: order.guestName || "Customer",
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          reason,
+        },
+        `RETURN_REQUESTED_CUSTOMER_${created.id}`,
+      );
+    }
+
+    // Admin alert: DB setting first, then ADMIN_EMAIL env var fallback
+    const returnAdminEmails: string[] = [];
+    if (settings?.adminAlertsEnabled && settings?.adminNotificationEmails) {
+      try {
+        const parsed = JSON.parse(settings.adminNotificationEmails);
+        if (Array.isArray(parsed)) {
+          returnAdminEmails.push(...parsed.map((e: string) => String(e).trim()).filter(Boolean));
+        }
+      } catch {
+        const dbEmails = settings.adminNotificationEmails.split(",").map((e: string) => e.trim()).filter(Boolean);
+        returnAdminEmails.push(...dbEmails);
       }
+    }
+    const envAdmin = process.env.ADMIN_EMAIL;
+    if (envAdmin && !returnAdminEmails.includes(envAdmin)) {
+      returnAdminEmails.push(envAdmin);
+    }
+    for (const adminEmail of returnAdminEmails) {
+      await enqueueEmailJob(
+        tx,
+        "RETURN_REQUESTED_ADMIN",
+        adminEmail,
+        "admin_new_return_alert",
+        {
+          ...created,
+          customerName: order.guestName || "Customer",
+          orderNumber: order.orderNumber,
+          reason,
+        },
+        `RETURN_REQUESTED_ADMIN_${created.id}_${adminEmail}`,
+      );
     }
 
     return created;

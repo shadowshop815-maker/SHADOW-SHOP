@@ -1,6 +1,8 @@
 node_modules/
 dist/
 **/.env
+**/.env.production
+**/.env.local
 *.log
 coverage/
 apps/backend/uploads/*
