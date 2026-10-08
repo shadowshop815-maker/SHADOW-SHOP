@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Upload, LocateFixed, Search, X, CheckCircle2, MapPin } from "lucide-react";
 import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import { api } from "../../api";
+import { api, resolveImageUrl } from "../../api";
 import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Loading, ErrorState } from "../../components/ui";
 import { HeroSlideEditor } from "../../components/HeroSlideEditor";
@@ -327,7 +327,7 @@ function SettingsForm({ section, initial, fields, textareas = [], numberFields =
                         boxShadow: "inset 0 2px 10px rgba(0,0,0,0.2)"
                       }}
                     >
-                      <img src={String(form[key])} alt={key} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", zIndex: 1, padding: 12 }} />
+                      <img src={resolveImageUrl(String(form[key]))} alt={key} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", zIndex: 1, padding: 12 }} />
                       <div 
                         className="image-upload-overlay"
                         style={{

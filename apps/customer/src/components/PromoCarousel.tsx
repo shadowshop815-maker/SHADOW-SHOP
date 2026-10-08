@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { resolveImageUrl } from "../api";
 
 export function PromoCarousel({ banners }: { banners: any[] }) {
   const [current, setCurrent] = useState(0);
@@ -50,7 +51,7 @@ export function PromoCarousel({ banners }: { banners: any[] }) {
             <div style={{ position: "relative", width: "100%", height: "100%" }}>
               {/* Actual Image - Never Cropped */}
               <img
-                src={banner.image}
+                src={resolveImageUrl(banner.image)}
                 alt={banner.title || `Promotion ${i + 1}`}
                 loading="lazy"
                 style={{

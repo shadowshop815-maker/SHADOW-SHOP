@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, ShieldCheck, Truck, RefreshCw, Headphones, Sparkles } from "lucide-react";
-import { api } from "../api";
+import { api, resolveImageUrl } from "../api";
 import type { StoreData, Product } from "../types";
 import { Spinner } from "../components/ui";
 import { ProductCard } from "../components/product/ProductCard";
@@ -243,7 +243,7 @@ export function Home() {
               {promoSlides[0].link && promoSlides[0].link !== "none" ? (
                 <Link to={promoSlides[0].link} style={{ display: "block" }}>
                   <img
-                    src={promoSlides[0].image}
+                    src={resolveImageUrl(promoSlides[0].image)}
                     alt={promoSlides[0].title || "SHADOW SHOP promotion"}
                     loading="lazy"
                     style={{ width: "100%", borderRadius: "var(--radius-lg)", display: "block", objectFit: "cover", maxHeight: 500 }}
@@ -251,7 +251,7 @@ export function Home() {
                 </Link>
               ) : (
                 <img
-                  src={promoSlides[0].image}
+                  src={resolveImageUrl(promoSlides[0].image)}
                   alt={promoSlides[0].title || "SHADOW SHOP promotion"}
                   loading="lazy"
                   style={{ width: "100%", borderRadius: "var(--radius-lg)", display: "block", objectFit: "cover", maxHeight: 500 }}
@@ -302,7 +302,7 @@ export function Home() {
               <StaggerItem key={item.id} index={idx}>
                 <article className="story" style={{ height: "100%" }}>
                   {item.coverImage ? (
-                    <img src={item.coverImage} alt={item.title} loading="lazy" />
+                    <img src={resolveImageUrl(item.coverImage)} alt={item.title} loading="lazy" />
                   ) : (
                     <div className="story-art">SS</div>
                   )}

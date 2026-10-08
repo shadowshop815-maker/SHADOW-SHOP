@@ -7,7 +7,7 @@ import { optionalAuth, requireAuth } from "../middleware/auth.js";
 import { AppError, asyncHandler, success } from "../utils/http.js";
 import { OfferEngine, CartContext } from "../services/OfferEngine.js";
 import { ShippingPricingService } from "../services/ShippingPricingService.js";
-import { enqueueEmailJob } from "../services/email/dispatcher.js";
+import { enqueueEmailJob, triggerDispatch } from "../services/email/dispatcher.js";
 
 export const commerceRouter = Router();
 
@@ -488,6 +488,7 @@ commerceRouter.post("/checkout", optionalAuth, asyncHandler(async (req, res) => 
 
     return createdOrder;
   }, { maxWait: 15000, timeout: 15000 });
+  triggerDispatch().catch(err => console.error("[Commerce] Immediate dispatch error:", err));
   const cart = await getCart(req, false); if (cart) await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
   return success(res, "Order placed successfully.", created, 201);
 }));

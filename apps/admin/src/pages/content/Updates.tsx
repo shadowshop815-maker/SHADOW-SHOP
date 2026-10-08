@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Archive } from "lucide-react";
-import { api } from "../../api";
+import { api, resolveImageUrl } from "../../api";
 import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Loading, ErrorState, Empty, StatusBadge } from "../../components/ui";
 import { ContentEditor } from "./ContentEditor";
@@ -31,7 +31,7 @@ export function Updates() {
           <div className="content-grid">
             {data.map(i => (
               <article className="content-card" key={i.id}>
-                {i.coverImage ? <img src={i.coverImage} alt="" /> : <div className="content-art">SS</div>}
+                {i.coverImage ? <img src={resolveImageUrl(i.coverImage)} alt="" /> : <div className="content-art">SS</div>}
                 <div>
                   <StatusBadge value={i.status} />
                   <h3>{i.title}</h3>

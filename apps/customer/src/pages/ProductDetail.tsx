@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Minus, Plus, ShoppingBag, ShieldCheck, Truck, RefreshCw, Heart, Sparkles, ArrowRight } from "lucide-react";
-import { api, money } from "../api";
+import { api, money, resolveImageUrl } from "../api";
 import { useAuth } from "../features/auth/AuthContext";
 import type { Product } from "../types";
 import { Spinner, Status } from "../components/ui";
@@ -30,7 +30,8 @@ export function ProductDetail() {
   
   useEffect(() => {
     if (data?.product) {
-      setImage(data.product.thumbnail || data.product.images[0]?.url || "");
+      const thumb = data.product.thumbnail || data.product.images[0]?.url || "";
+      setImage(thumb ? resolveImageUrl(thumb) : "");
       setSize(data.product.sizes[0] || "");
       setColor(data.product.colors[0] || "");
       setQuantity(1);
@@ -103,7 +104,9 @@ export function ProductDetail() {
   if (error || !data) return <Status error={error}>{null}</Status>; 
   
   const p = data.product; 
-  const gallery = [p.thumbnail, ...p.images.map(i => i.url)].filter((v, i, a) => v && a.indexOf(v) === i); 
+  const gallery = [p.thumbnail, ...p.images.map(i => i.url)]
+    .filter((v, i, a) => v && a.indexOf(v) === i)
+    .map(url => resolveImageUrl(url)); 
   const effectivePrice = p.salePrice ?? p.price;
   const discountPercent = p.salePrice && Number(p.price) > 0
     ? Math.round((1 - Number(p.salePrice) / Number(p.price)) * 100) 
@@ -128,6 +131,7 @@ export function ProductDetail() {
             <img 
               src={image || "/assets/product-fallback.svg"} 
               alt={p.name} 
+              onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
               style={{
                 width: "100%",
                 height: "100%",

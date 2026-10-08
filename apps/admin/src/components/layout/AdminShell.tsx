@@ -7,7 +7,7 @@ import {
   Settings, ShieldAlert, BarChart3, Menu, Sun, Moon, LogOut, Receipt, Mail
 } from "lucide-react";
 import { useAuth } from "../../features/auth/AuthContext";
-import { api } from "../../api";
+import { api, resolveImageUrl } from "../../api";
 
 const nav = [
   { label: "Dashboard", items: [["/", LayoutDashboard, "Overview"]] },
@@ -47,7 +47,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="control-brand">
           {headerLogo ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4 }}>
-              <img src={headerLogo} alt={storeName} style={{ maxHeight: "24px", maxWidth: "100%", objectFit: "contain" }} />
+              <img src={resolveImageUrl(headerLogo)} alt={storeName} style={{ maxHeight: "24px", maxWidth: "100%", objectFit: "contain" }} />
               <small>CONTROL CENTER</small>
             </div>
           ) : (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { api } from "../../api";
+import { api, resolveImageUrl } from "../../api";
 import { useAuth } from "../../features/auth/AuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import type { StoreData } from "../../types";
@@ -11,7 +11,7 @@ import { Mail, Phone, MapPin, MessageCircle, Send, CheckCircle2, Loader2 } from 
 const MapDisplay = ({ lat, lng, logo }: { lat: number; lng: number; logo?: string }) => {
   const markerIcon = L.divIcon({ 
     className: "map-marker-container", 
-    html: logo ? `<div style="width:48px;height:48px;background:var(--bg);border:2px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,0.2);"><img src="${logo}" style="width:85%;height:85%;object-fit:contain;" /></div>` : `<span class="map-marker"><span></span></span>`, 
+    html: logo ? `<div style="width:48px;height:48px;background:var(--bg);border:2px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,0.2);"><img src="${resolveImageUrl(logo)}" style="width:85%;height:85%;object-fit:contain;" /></div>` : `<span class="map-marker"><span></span></span>`, 
     iconSize: logo ? [48, 48] : [24, 24], 
     iconAnchor: logo ? [24, 48] : [12, 24] 
   });

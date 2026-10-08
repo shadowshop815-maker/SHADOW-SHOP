@@ -7,3 +7,13 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const response = await fetch(`${API_URL}${path}`, { ...options, headers }); const payload = await response.json().catch(() => ({ success: false, message: "The server returned an invalid response." })); if (!response.ok || !payload.success) throw new ApiError(payload.message || "Request failed.", payload.error?.code || "REQUEST_FAILED", payload.error?.fields); return payload.data as T;
 }
 export const money = (value: number | string) => "₹" + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
+
+export const resolveImageUrl = (url?: string | null, fallback = "/assets/product-fallback.svg") => {
+  if (!url) return fallback;
+  if (url.startsWith("http")) return url;
+  if (url.startsWith("/uploads/")) {
+    const base = API_URL.replace(/\/api\/v1\/?$/, "");
+    return `${base}${url}`;
+  }
+  return url;
+};

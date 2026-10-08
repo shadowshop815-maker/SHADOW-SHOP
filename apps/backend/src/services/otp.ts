@@ -20,8 +20,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../config/db.js";
 import { env } from "../config/env.js";
 import { AppError } from "../utils/http.js";
-import { sendEmail } from "./email/emailService.js";
-import { generateEmailHtml, generateEmailText } from "./email/emailTemplates.js";
+import { enqueueEmailJob, triggerDispatch } from "./email/dispatcher.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,60 +72,7 @@ async function getOtpConfig() {
   });
 }
 
-// ─── Email delivery ───────────────────────────────────────────────────────────
-
-async function deliverOtpEmail(
-  destination: string,
-  purpose: OtpPurpose,
-  code: string,
-  expiryMinutes: number,
-): Promise<void> {
-  const templateId = getTemplateId(purpose);
-  const payload = {
-    code,
-    expiryMinutes,
-    purpose,
-    purposeLabel: getPurposeLabel(purpose),
-  };
-
-  // Dev mode: always print to console for easy local testing
-  if (env.NODE_ENV === "development") {
-    console.log(`\n${"═".repeat(60)}`);
-    console.log(`  SHADOW SHOP OTP [DEV MODE]`);
-    console.log(`${"═".repeat(60)}`);
-    console.log(`  Purpose    : ${getPurposeLabel(purpose)}`);
-    console.log(`  Destination: ${mask(destination)}`);
-    console.log(`  OTP Code   : ${code}`);
-    console.log(`  Expires In : ${expiryMinutes} minutes`);
-    console.log(`${"═".repeat(60)}\n`);
-  }
-
-  const provider = env.EMAIL_PROVIDER || "none";
-
-  if (provider === "none") {
-    if (env.NODE_ENV === "production") {
-      throw new AppError(503, "OTP delivery is not configured. Please contact support.", "OTP_PROVIDER_NOT_CONFIGURED");
-    }
-    // Dev: console log already shown above, that's sufficient
-    return;
-  }
-
-  const subject = `Your SHADOW SHOP ${getPurposeLabel(purpose)} Code`;
-  const html = generateEmailHtml(templateId, payload);
-  const text = generateEmailText(templateId, payload);
-
-  const result = await sendEmail({ to: destination, subject, html, text });
-
-  if (!result.success) {
-    // Surface as AppError so the OTP record is cleaned up by the caller
-    throw new AppError(
-      503,
-      "Unable to send verification code right now. Please try again.",
-      "OTP_DELIVERY_FAILED",
-    );
-  }
-}
-
+// Email delivery is now handled via the outbox queue inside createOtp
 // ─── SMS delivery (separate system — not changed) ─────────────────────────────
 
 async function deliverOtpSms(
@@ -205,26 +151,43 @@ export async function createOtp(
   const codeHash = await bcrypt.hash(code, 10);
   const expiresAt = new Date(Date.now() + config.otpExpiryMinutes * 60_000);
 
-  const record = await prisma.oTPVerification.create({
-    data: {
-      destination: normalized,
-      purpose,
-      codeHash,
-      expiresAt,
-    },
+  // Run in a transaction to ensure OTP creation and email enqueuing are atomic
+  await prisma.$transaction(async (tx: any) => {
+    await tx.oTPVerification.create({
+      data: {
+        destination: normalized,
+        purpose,
+        codeHash,
+        expiresAt,
+      },
+    });
+
+    if (isEmail) {
+      const templateId = getTemplateId(purpose);
+      const payload = {
+        code,
+        expiryMinutes: config.otpExpiryMinutes,
+        purpose,
+        purposeLabel: getPurposeLabel(purpose),
+      };
+      
+      await enqueueEmailJob(
+        tx,
+        "OTP_REQUEST",
+        normalized,
+        templateId,
+        payload
+      );
+    }
   });
 
-  // Deliver OTP — if delivery fails, clean up the record (so user can retry)
-  try {
-    if (isEmail) {
-      await deliverOtpEmail(normalized, purpose, code, config.otpExpiryMinutes);
-    } else {
-      await deliverOtpSms(normalized, purpose, code, config.otpExpiryMinutes);
-    }
-  } catch (error) {
-    // Clean up the record so the user can request a fresh OTP
-    await prisma.oTPVerification.delete({ where: { id: record.id } }).catch(() => null);
-    throw error;
+  if (isEmail) {
+    // Attempt immediate dispatch for fast delivery
+    // If it fails, the cron job will retry it later.
+    triggerDispatch().catch(err => console.error("[OTP] Immediate dispatch error:", err));
+  } else {
+    // SMS remains synchronous for now
+    await deliverOtpSms(normalized, purpose, code, config.otpExpiryMinutes);
   }
 
   return { expiresAt, resendAfterSeconds: config.otpResendCooldownSeconds };

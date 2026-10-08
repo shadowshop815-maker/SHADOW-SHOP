@@ -51,6 +51,11 @@ const schema = z.object({
   // Google Apps Script email relay (legacy optional)
   GAS_WEBHOOK_URL: z.string().default(""),
 
+  // Brevo API (Transactional Email)
+  BREVO_API_KEY: z.string().trim().default(""),
+  EMAIL_REPLY_TO: z.string().default(""),
+  ADMIN_NOTIFICATION_EMAIL: z.string().default(""),
+
   // SMS (separate system)
   SMS_PROVIDER: z.string().default("none"),
   SMS_API_KEY: z.string().default(""),
@@ -62,6 +67,9 @@ const schema = z.object({
 
   // Development-only email test destination
   EMAIL_TEST_TO: z.string().default(""),
+
+  // System
+  SYSTEM_SECRET: z.string().default(""),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -100,6 +108,22 @@ function validateEmailConfig() {
     console.log(`[EMAIL] Provider: smtp`);
     console.log(`[EMAIL] SMTP host: ${env.SMTP_HOST || "(not set)"}`);
     console.log(`[EMAIL] SMTP user configured: ${env.SMTP_USER ? "YES" : "NO"}`);
+  } else if (provider === "brevo") {
+    const issues: string[] = [];
+    if (!env.BREVO_API_KEY) issues.push("BREVO_API_KEY is missing");
+    if (!env.EMAIL_FROM) issues.push("EMAIL_FROM is missing");
+
+    if (issues.length > 0) {
+      console.error("[EMAIL] ❌ Email provider configuration errors (brevo):");
+      issues.forEach(issue => console.error(`[EMAIL]   - ${issue}`));
+      if (env.NODE_ENV === "production") {
+        throw new Error(`Email configuration invalid for production:\n${issues.join("\n")}`);
+      }
+    } else {
+      console.log(`[EMAIL] Provider: brevo`);
+      console.log(`[EMAIL] API key configured: YES`);
+      console.log(`[EMAIL] Sender configured: YES (${env.EMAIL_FROM_NAME} <${env.EMAIL_FROM}>)`);
+    }
   } else if (provider === "gas") {
     console.log(`[EMAIL] Provider: gas (Google Apps Script relay)`);
   } else {

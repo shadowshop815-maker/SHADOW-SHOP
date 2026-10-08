@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, MapPin, Printer, ArrowLeft, Calendar, Clock, Truck, ShieldCheck, Package, AlertCircle } from "lucide-react";
-import { api, money } from "../../api";
+import { api, money, resolveImageUrl } from "../../api";
 import type { Order } from "../../types";
 import { Spinner, Status } from "../../components/ui";
 import { Invoice } from "../../components/ui/Invoice";
@@ -213,8 +213,9 @@ export function OrderDetail() {
                     padding: "6px" 
                   }}>
                     <img 
-                      src={i.productImageSnapshot || "/assets/product-fallback.svg"} 
+                      src={resolveImageUrl(i.productImageSnapshot || "/assets/product-fallback.svg")} 
                       alt={i.productNameSnapshot} 
+                      onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
                       style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} 
                     />
                   </div>

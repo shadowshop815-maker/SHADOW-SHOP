@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Search, X, ArrowRight, Loader2, Sparkles } from "lucide-react";
-import { api, money } from "../api";
+import { api, money, resolveImageUrl } from "../api";
 import type { Product } from "../types";
 import { Reveal, StaggerContainer, StaggerItem } from "../components/motion/Motion";
 
@@ -164,7 +164,7 @@ export function SearchPage() {
                       }}
                     >
                       <div style={{ width: 84, height: 84, borderRadius: 12, overflow: "hidden", background: "var(--layer-2)", flexShrink: 0, padding: 6 }}>
-                        <img src={p.thumbnail || "/assets/product-fallback.svg"} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        <img src={resolveImageUrl(p.thumbnail || "/assets/product-fallback.svg")} alt={p.name} onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <span style={{ fontSize: "11px", color: "var(--gold)", fontWeight: 700, textTransform: "uppercase" }}>

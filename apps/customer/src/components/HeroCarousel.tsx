@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { resolveImageUrl } from "../api";
 
 export function HeroCarousel({ heroImage, link }: { heroImage?: string; link?: string }) {
   let slides: any[] = [];
@@ -41,10 +42,10 @@ export function HeroCarousel({ heroImage, link }: { heroImage?: string; link?: s
           }}>
             {slide.link !== "none" ? (
               <Link to={slide.link || link || "/products"} className="hero-slide-link" style={{ display: "block", width: "100%", height: "100%", overflow: "hidden", borderRadius: 34 }}>
-                <img src={slide.image} alt="SHADOW SHOP Hero" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} />
+                <img src={resolveImageUrl(slide.image)} alt="SHADOW SHOP Hero" style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }} />
               </Link>
             ) : (
-              <img src={slide.image} alt="SHADOW SHOP Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 34 }} />
+              <img src={resolveImageUrl(slide.image)} alt="SHADOW SHOP Hero" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 34 }} />
             )}
           </div>
         );

@@ -28,7 +28,7 @@ export interface SendEmailOptions {
 
 export interface SendEmailResult {
   success: boolean;
-  provider: "resend" | "smtp" | "gas" | "console" | "none";
+  provider: "resend" | "smtp" | "brevo" | "gas" | "console" | "none";
   messageId?: string;
   error?: string;
 }
@@ -179,6 +179,66 @@ async function sendViaGas(options: SendEmailOptions): Promise<SendEmailResult> {
   }
 }
 
+// ─── Brevo Provider ────────────────────────────────────────────────────────────
+
+async function sendViaBrevo(options: SendEmailOptions): Promise<SendEmailResult> {
+  if (!env.BREVO_API_KEY) {
+    return { success: false, provider: "brevo", error: "BREVO_API_KEY not configured" };
+  }
+  if (!env.EMAIL_FROM) {
+    return { success: false, provider: "brevo", error: "EMAIL_FROM not configured" };
+  }
+
+  const body: Record<string, unknown> = {
+    sender: { name: env.EMAIL_FROM_NAME || "SHADOW SHOP", email: env.EMAIL_FROM },
+    to: [{ email: options.to }],
+    subject: options.subject,
+    htmlContent: options.html,
+  };
+
+  if (options.text) body.textContent = options.text;
+  if (options.replyTo) body.replyTo = { email: options.replyTo };
+  if (options.tags) body.tags = options.tags.map(t => t.name);
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": env.BREVO_API_KEY,
+        "accept": "application/json"
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (networkErr: unknown) {
+    const msg = networkErr instanceof Error ? networkErr.message : String(networkErr);
+    return { success: false, provider: "brevo", error: `Network error: ${msg}` };
+  }
+
+  let responseData: any;
+  try {
+    responseData = await response.json();
+  } catch {
+    responseData = {};
+  }
+
+  if (!response.ok || responseData.error || responseData.code) {
+    const errorMsg = responseData?.message || responseData?.error || `HTTP ${response.status}`;
+    return {
+      success: false,
+      provider: "brevo",
+      error: `Brevo API error: ${errorMsg} (status=${response.status})`,
+    };
+  }
+
+  return {
+    success: true,
+    provider: "brevo",
+    messageId: responseData.messageId || responseData.messageIds?.[0],
+  };
+}
+
 // ─── Console / Dev fallback ───────────────────────────────────────────────────
 
 function sendToConsole(options: SendEmailOptions): SendEmailResult {
@@ -216,6 +276,8 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendEmailRes
     result = await sendViaResend({ ...options, to: recipient });
   } else if (provider === "smtp") {
     result = await sendViaSmtp({ ...options, to: recipient });
+  } else if (provider === "brevo") {
+    result = await sendViaBrevo({ ...options, to: recipient });
   } else if (provider === "gas") {
     result = await sendViaGas({ ...options, to: recipient });
   } else if (env.NODE_ENV !== "production") {

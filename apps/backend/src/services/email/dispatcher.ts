@@ -137,6 +137,7 @@ export const processEmailJobs = async (): Promise<void> => {
   const hasProvider =
     (provider === "resend" && env.RESEND_API_KEY && env.EMAIL_FROM) ||
     (provider === "smtp" && env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD) ||
+    (provider === "brevo" && env.BREVO_API_KEY && env.EMAIL_FROM) ||
     (provider === "gas" && env.GAS_WEBHOOK_URL) ||
     (provider !== "none" && env.NODE_ENV !== "production"); // dev console fallback
 
@@ -233,19 +234,25 @@ export const startEmailDispatcher = (): void => {
   console.log("[Email Dispatcher] Started background worker (interval: 10s)");
 
   setInterval(async () => {
-    if (_isProcessing) return;
-    _isProcessing = true;
-    try {
-      await processEmailJobs();
-    } catch (err: any) {
-      if (err?.code === "P1001" || err?.code === "P1017") {
-        // Database temporarily unreachable — silently retry next cycle
-        console.warn("[Email Dispatcher] Database temporarily unreachable. Retrying in next cycle...");
-      } else {
-        console.error("[Email Dispatcher] Unhandled loop error:", err?.message || err);
-      }
-    } finally {
-      _isProcessing = false;
-    }
+    await triggerDispatch();
   }, 10_000); // Check every 10 seconds
+};
+
+export const triggerDispatch = async (): Promise<boolean> => {
+  if (_isProcessing) return false;
+  _isProcessing = true;
+  try {
+    await processEmailJobs();
+    return true;
+  } catch (err: any) {
+    if (err?.code === "P1001" || err?.code === "P1017") {
+      // Database temporarily unreachable
+      console.warn("[Email Dispatcher] Database temporarily unreachable.");
+    } else {
+      console.error("[Email Dispatcher] Unhandled trigger error:", err?.message || err);
+    }
+    return false;
+  } finally {
+    _isProcessing = false;
+  }
 };

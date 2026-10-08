@@ -4,7 +4,7 @@ import { prisma } from "../config/db.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { AppError, asyncHandler, success } from "../utils/http.js";
 import { audit } from "../services/audit.js";
-import { enqueueEmailJob } from "../services/email/dispatcher.js";
+import { enqueueEmailJob, triggerDispatch } from "../services/email/dispatcher.js";
 
 export const adminReturnsRouter = Router();
 adminReturnsRouter.use(requireAuth, requireAdmin);
@@ -184,6 +184,7 @@ adminReturnsRouter.patch("/:id/status", asyncHandler(async (req, res) => {
     return updatedRet;
   });
   
+  triggerDispatch().catch(err => console.error("[AdminReturns] Immediate dispatch error:", err));
   await audit(req.auth!.id, "RETURN_STATUS_CHANGE", "ReturnRequest", ret.id, { from: ret.status, to: next, adminResponse });
   return success(res, "Return status updated", updated);
 }));

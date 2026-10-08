@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Plus, GripVertical } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api";
+import { api, resolveImageUrl } from "../api";
 
 export function HeroSlideEditor({ value, onChange }: { value: string, onChange: (val: string) => void }) {
   let initialSlides: any[] = [];
@@ -66,7 +66,7 @@ export function HeroSlideEditor({ value, onChange }: { value: string, onChange: 
             <div style={{ cursor: "grab", color: "var(--muted)" }}><GripVertical size={20}/></div>
             
             <div style={{ width: 120, height: 80, borderRadius: 8, border: "1px dashed var(--line)", position: "relative", overflow: "hidden", display: "grid", placeItems: "center", background: slide.image ? "transparent" : "var(--panel)" }}>
-              {slide.image ? <img src={slide.image} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 10, color: "var(--muted)" }}>No Image</span>}
+              {slide.image ? <img src={resolveImageUrl(slide.image)} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 10, color: "var(--muted)" }}>No Image</span>}
               <div style={{ position: "absolute", inset: 0, opacity: busy === `upload-${i}` ? 1 : 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", color: "white", fontSize: 12 }}>...</div>
               <input type="file" accept="image/*" onChange={e => e.target.files?.[0] && upload(e.target.files[0], i)} style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
             </div>

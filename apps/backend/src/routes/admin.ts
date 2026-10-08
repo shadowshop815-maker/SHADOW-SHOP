@@ -11,7 +11,7 @@ import { env, uploadDirectory } from "../config/env.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { audit } from "../services/audit.js";
 import { AppError, asyncHandler, success } from "../utils/http.js";
-import { enqueueEmailJob } from "../services/email/dispatcher.js";
+import { enqueueEmailJob, triggerDispatch } from "../services/email/dispatcher.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireAdmin);
@@ -190,6 +190,7 @@ adminRouter.patch("/orders/:id/status", asyncHandler(async (req, res) => {
     
     return updatedOrder;
   }); 
+  triggerDispatch().catch(err => console.error("[Admin] Immediate dispatch error:", err));
   await audit(req.auth!.id, "ORDER_STATUS_CHANGE", "Order", order.id, { from: order.orderStatus, to: next }); 
   return success(res, "Order status updated.", updated); 
 }));

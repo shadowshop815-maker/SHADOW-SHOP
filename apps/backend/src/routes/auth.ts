@@ -5,8 +5,7 @@ import { prisma } from "../config/db.js";
 import { requireAuth, signToken } from "../middleware/auth.js";
 import { createOtp, verifyOtp } from "../services/otp.js";
 import { AppError, asyncHandler, success } from "../utils/http.js";
-import { sendEmail } from "../services/email/emailService.js";
-import { generateEmailHtml, generateEmailText } from "../services/email/emailTemplates.js";
+import { enqueueEmailJob, triggerDispatch } from "../services/email/dispatcher.js";
 import { env } from "../config/env.js";
 
 export const authRouter = Router();
@@ -132,13 +131,14 @@ authRouter.post("/otp/verify", asyncHandler(async (req, res) => {
     // Send welcome email after first-time email verification
     const user = await prisma.user.findFirst({ where: { email: destination } });
     if (user && input.purpose === "REGISTRATION") {
-      // Fire-and-forget — don't block the verify response
-      sendEmail({
-        to: destination,
-        subject: "Welcome to SHADOW SHOP",
-        html: generateEmailHtml("welcome", { name: user.name }),
-        text: generateEmailText("welcome", { name: user.name }),
-      }).catch(err => console.error("[Auth] Welcome email failed:", err?.message));
+      await enqueueEmailJob(
+        prisma,
+        "WELCOME_EMAIL",
+        destination,
+        "welcome",
+        { name: user.name }
+      );
+      triggerDispatch().catch(err => console.error("[Auth] Dispatch error:", err));
     }
   }
 
@@ -189,13 +189,15 @@ authRouter.post("/password/reset", asyncHandler(async (req, res) => {
     data: { passwordHash: await bcrypt.hash(password, 12) },
   });
 
-  // Send password-changed notification (fire-and-forget)
-  sendEmail({
-    to: user.email,
-    subject: "Your SHADOW SHOP Password Was Changed",
-    html: generateEmailHtml("password_changed", { name: user.name }),
-    text: generateEmailText("password_changed", { name: user.name }),
-  }).catch(err => console.error("[Auth] Password-changed email failed:", err?.message));
+  // Send password-changed notification
+  await enqueueEmailJob(
+    prisma,
+    "PASSWORD_CHANGED",
+    user.email,
+    "password_changed",
+    { name: user.name }
+  );
+  triggerDispatch().catch(err => console.error("[Auth] Dispatch error:", err));
 
   return success(res, "Password changed. You can now sign in.", {});
 }));
@@ -249,13 +251,15 @@ authRouter.post("/password/change", requireAuth, asyncHandler(async (req, res) =
     data: { passwordHash: await bcrypt.hash(password, 12) },
   });
 
-  // Send password-changed notification (fire-and-forget)
-  sendEmail({
-    to: user.email,
-    subject: "Your SHADOW SHOP Password Was Changed",
-    html: generateEmailHtml("password_changed", { name: user.name }),
-    text: generateEmailText("password_changed", { name: user.name }),
-  }).catch(err => console.error("[Auth] Password-changed email failed:", err?.message));
+  // Send password-changed notification
+  await enqueueEmailJob(
+    prisma,
+    "PASSWORD_CHANGED",
+    user.email,
+    "password_changed",
+    { name: user.name }
+  );
+  triggerDispatch().catch(err => console.error("[Auth] Dispatch error:", err));
 
   return success(res, "Password updated.", {});
 }));

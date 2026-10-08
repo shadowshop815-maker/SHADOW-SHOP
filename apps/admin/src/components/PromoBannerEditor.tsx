@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Plus, GripVertical, Image } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../api";
+import { api, resolveImageUrl } from "../api";
 
 /**
  * PromoBannerEditor
@@ -140,7 +140,7 @@ export function PromoBannerEditor({
                 >
                   {banner.image ? (
                     <img
-                      src={banner.image}
+                      src={resolveImageUrl(banner.image)}
                       alt="Promo"
                       style={{ width: "100%", height: "100%", objectFit: "contain" }}
                     />

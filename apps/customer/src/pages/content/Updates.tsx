@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../api";
+import { api, resolveImageUrl } from "../../api";
 import { Spinner, Status } from "../../components/ui";
 
 export function Updates({ media = false }: { media?: boolean }) { 
@@ -22,9 +22,9 @@ export function Updates({ media = false }: { media?: boolean }) {
             {data?.map(item => (
               <article key={item.id} className="media-item">
                 {item.type === "VIDEO" ? (
-                  <video src={item.url} controls preload="none"/>
+                  <video src={resolveImageUrl(item.url)} controls preload="none"/>
                 ) : (
-                  <img src={item.url} alt=""/>
+                  <img src={resolveImageUrl(item.url)} alt=""/>
                 )}
                 {item.title && <h3>{item.title}</h3>}
               </article>
@@ -34,7 +34,7 @@ export function Updates({ media = false }: { media?: boolean }) {
           <div className="update-list">
             {data?.map(item => (
               <article className="update-article" key={item.id}>
-                {item.coverImage && <img src={item.coverImage} alt=""/>}
+                {item.coverImage && <img src={resolveImageUrl(item.coverImage)} alt=""/>}
                 <div className="update-content">
                   <time>{new Date(item.publishDate).toLocaleDateString()}</time>
                   <h2>{item.title}</h2>

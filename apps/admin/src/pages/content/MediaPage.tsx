@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Archive } from "lucide-react";
-import { api } from "../../api";
+import { api, resolveImageUrl } from "../../api";
 import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Loading, ErrorState, Empty, StatusBadge } from "../../components/ui";
 import { ContentEditor } from "./ContentEditor";
@@ -31,7 +31,7 @@ export function MediaPage() {
           <div className="content-grid">
             {data.map(i => (
               <article className="content-card" key={i.id}>
-                {i.thumbnail || i.type === "IMAGE" ? <img src={i.thumbnail || i.url} alt="" /> : <div className="content-art">{i.type}</div>}
+                {i.thumbnail || i.type === "IMAGE" ? <img src={resolveImageUrl(i.thumbnail || i.url)} alt="" /> : <div className="content-art">{i.type}</div>}
                 <div>
                   <StatusBadge value={i.status} />
                   <h3>{i.title}</h3>

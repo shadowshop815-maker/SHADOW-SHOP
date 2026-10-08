@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Minus, Plus, Trash2, ShieldCheck, Truck } from "lucide-react";
-import { api, money } from "../api";
+import { api, money, resolveImageUrl } from "../api";
 import type { Cart } from "../types";
 import { Spinner, Status } from "../components/ui";
 import { OfferPanel } from "../components/ui/OfferPanel";
@@ -128,8 +128,9 @@ export function CartPage() {
                     <article className="cart-item" key={item.id} style={{ alignItems: "center" }}>
                       <Link to={`/products/${item.product.slug}`} style={{ display: "block" }}>
                         <img 
-                          src={item.product.thumbnail || "/assets/product-fallback.svg"} 
+                          src={resolveImageUrl(item.product.thumbnail || "/assets/product-fallback.svg")} 
                           alt={item.product.name}
+                          onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
                           style={{ borderRadius: "var(--radius-md)", objectFit: "contain", background: "var(--layer-2)", padding: 8 }}
                         />
                       </Link>

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Heart, ShoppingBag, Check, ArrowRight } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, money } from "../../api";
+import { api, money, resolveImageUrl } from "../../api";
 import type { Product } from "../../types";
 
 export function ProductCard({ product }: { product: Product }) {
@@ -39,8 +39,8 @@ export function ProductCard({ product }: { product: Product }) {
   };
 
   const hasVariants = (product.sizes && product.sizes.length > 0) || (product.colors && product.colors.length > 0);
-  const secondaryImage = product.images && product.images.length > 1 ? product.images[1]?.url : null;
-  const primaryImage = product.thumbnail || product.images?.[0]?.url || "/assets/product-fallback.svg";
+  const secondaryImage = product.images && product.images.length > 1 ? resolveImageUrl(product.images[1]?.url) : null;
+  const primaryImage = resolveImageUrl(product.thumbnail || product.images?.[0]?.url);
 
   const effectivePrice = product.salePrice ?? product.price;
   const discountPercent = product.salePrice && Number(product.price) > 0

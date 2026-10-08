@@ -3,6 +3,7 @@ import { LocateFixed, MapPin, Search, X } from "lucide-react";
 import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import type { Address } from "../../types";
+import { resolveImageUrl } from "../../api";
 
 export const blankAddress: Address = { fullName: "", phone: "", line1: "", line2: "", landmark: "", town: "", city: "", district: "", state: "", pinCode: "", country: "India", latitude: null, longitude: null, formattedAddress: null, isDefault: false };
 
@@ -123,7 +124,7 @@ export function LocationPicker({ address, onChange, logo }: { address: Address; 
   
   const markerIcon = L.divIcon({ 
     className: "map-marker-container", 
-    html: logo ? `<div style="width:40px;height:40px;background:var(--panel);border:2px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,0.5);"><img src="${logo}" style="width:85%;height:85%;object-fit:contain;" /></div>` : `<span class="map-marker"><span></span></span>`, 
+    html: logo ? `<div style="width:40px;height:40px;background:var(--panel);border:2px solid var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,0.5);"><img src="${resolveImageUrl(logo)}" style="width:85%;height:85%;object-fit:contain;" /></div>` : `<span class="map-marker"><span></span></span>`, 
     iconSize: logo ? [40, 40] : [24, 24], 
     iconAnchor: logo ? [20, 20] : [12, 24] 
   });

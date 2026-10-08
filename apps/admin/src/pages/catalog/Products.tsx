@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Archive, Upload } from "lucide-react";
-import { api, money } from "../../api";
+import { api, money, resolveImageUrl } from "../../api";
 import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Toolbar, Loading, ErrorState, Empty, StatusBadge, Pager, Modal, Field, TextField, Pagination } from "../../components/ui";
 
@@ -87,7 +87,7 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
             <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
               {form.thumbnail ? (
                 <div style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", flexShrink: 0 }}>
-                  <img src={form.thumbnail} alt="Thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <img src={resolveImageUrl(form.thumbnail)} alt="Thumbnail" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   <button type="button" onClick={() => set("thumbnail", "")} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
                 </div>
               ) : (
@@ -104,7 +104,7 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {form.images.split("\n").map(s => s.trim()).filter(Boolean).map((url, i) => (
                 <div key={i} style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", flexShrink: 0 }}>
-                  <img src={url} alt={`Gallery ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  <img src={resolveImageUrl(url)} alt={`Gallery ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   <button type="button" onClick={() => {
                     const arr = form.images.split("\n").map(s => s.trim()).filter(Boolean);
                     arr.splice(i, 1);
@@ -240,7 +240,7 @@ export function Products() {
                     <tr key={p.id}>
                       <td>
                         <div className="product-cell">
-                          <img src={p.thumbnail || `${import.meta.env.VITE_CUSTOMER_URL || "http://localhost:3000"}/assets/product-fallback.svg`} alt="" />
+                          <img src={resolveImageUrl(p.thumbnail || "/assets/product-fallback.svg")} alt="" />
                           <b>{p.name}</b>
                         </div>
                       </td>

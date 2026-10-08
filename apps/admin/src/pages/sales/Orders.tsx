@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Printer, Phone } from "lucide-react";
-import { api, money } from "../../api";
+import { api, money, resolveImageUrl } from "../../api";
 import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Toolbar, Loading, ErrorState, Empty, StatusBadge, Pager, Modal, Pagination } from "../../components/ui";
 import { DeliveryMap } from "./DeliveryMap";
@@ -364,7 +364,7 @@ export function Orders() {
                 {selected.items.map(i => (
                   <div className="line-item" key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", background: "var(--panel2)", borderRadius: "8px", border: "1px solid var(--line)" }}>
                     <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                      {i.productImageSnapshot && <img src={i.productImageSnapshot} alt="" style={{ width: 44, height: 44, objectFit: "cover", borderRadius: "8px" }} />}
+                      {i.productImageSnapshot && <img src={resolveImageUrl(i.productImageSnapshot)} alt="" style={{ width: 44, height: 44, objectFit: "cover", borderRadius: "8px" }} />}
                       <div>
                         <div style={{ fontWeight: 600, color: "var(--ink)", fontSize: "13px" }}>{i.productNameSnapshot}</div>
                         <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "2px" }}>

@@ -13,6 +13,7 @@ import { adminRouter } from "./routes/admin.js";
 import { adminOffersRouter } from "./routes/adminOffers.js";
 import { adminReturnsRouter } from "./routes/adminReturns.js";
 import { returnsRouter } from "./routes/returns.js";
+import { systemRouter } from "./routes/system.js";
 import { errorHandler } from "./utils/http.js";
 
 export const app = express();
@@ -169,6 +170,7 @@ app.use("/api/v1/returns", rateLimit({ windowMs: 60_000, limit: 120, standardHea
 app.use("/api/v1/admin/offers", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminOffersRouter);
 app.use("/api/v1/admin/returns", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminReturnsRouter);
 app.use("/api/v1/admin", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminRouter);
+app.use("/api/v1/system", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: "draft-7", legacyHeaders: false }), systemRouter);
 app.get("/health", async (_req, res) => { try { await prisma.$queryRaw`SELECT 1`; res.json({ success: true, service: "SHADOW SHOP API", database: "connected" }); } catch { res.status(503).json({ success: false, service: "SHADOW SHOP API", database: "disconnected" }); } });
 app.use((_req, res) => res.status(404).json({ success: false, message: "Route not found.", error: { code: "NOT_FOUND" } }));
 app.use(errorHandler);

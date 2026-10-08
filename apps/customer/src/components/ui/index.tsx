@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { PackageOpen } from "lucide-react";
+import { resolveImageUrl } from "../../api";
 
 export function Status({ error, empty, children, emptyMessage = "Check back soon." }: { error?: Error | null; empty?: boolean; children: ReactNode; emptyMessage?: string }) { 
   if (error) return <div className="state error"><h2>Something went wrong</h2><p>{error.message}</p></div>; 
@@ -26,7 +27,7 @@ export function Brand({ logo, name = "SHADOW SHOP" }: { logo?: string; name?: st
   
   return (
     <Link to="/" className="brand" aria-label={`${name} home`}>
-      {logo && <img src={logo} alt={name}/>}
+      {logo && <img src={resolveImageUrl(logo, "")} alt={name} style={{ objectFit: "contain", maxWidth: "100%" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />}
       <div className={logo ? "brand-name-with-logo" : ""}>
         <span>{firstWord}</span>{rest ? <b> {rest}</b> : null}
       </div>
