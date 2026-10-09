@@ -2,18 +2,27 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import fs from "node:fs";
 
-// Resolve the directory of this file (works with tsx/esm)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Find root based on process.cwd() rather than __dirname which changes between src/dist
+const cwd = process.cwd();
+const isBackendDir = cwd.endsWith(path.join("apps", "backend")) || cwd.endsWith("apps/backend");
 
-// Load root .env first, then backend-specific .env (backend .env overrides root)
-// __dirname is apps/backend/src/config
-const rootEnvPath = path.resolve(__dirname, "../../../../.env");
-const backendEnvPath = path.resolve(__dirname, "../../.env");
+const rootEnvPath = isBackendDir ? path.resolve(cwd, "../../.env") : path.resolve(cwd, ".env");
+const backendEnvPath = isBackendDir ? path.resolve(cwd, ".env") : path.resolve(cwd, "apps/backend/.env");
 
-dotenv.config({ path: rootEnvPath, override: true });
-dotenv.config({ path: backendEnvPath, override: true }); // backend .env wins over root
+// In production, Render env vars should be the absolute truth.
+// Do not override existing env vars if they are set in the environment.
+const overrideEnv = process.env.NODE_ENV !== "production";
+
+if (fs.existsSync(rootEnvPath)) {
+  dotenv.config({ path: rootEnvPath, override: overrideEnv });
+}
+if (fs.existsSync(backendEnvPath)) {
+  dotenv.config({ path: backendEnvPath, override: overrideEnv });
+}
+
+const stripQuotes = (val: string) => val.replace(/^["']|["']$/g, "");
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -30,16 +39,16 @@ const schema = z.object({
   OTP_RESEND_COOLDOWN_SECONDS: z.coerce.number().nonnegative().default(60),
 
   // Email provider selection
-  EMAIL_PROVIDER: z.string().default("none"),
+  EMAIL_PROVIDER: z.string().transform(stripQuotes).default("none"),
 
   // Resend (primary provider)
-  RESEND_API_KEY: z.string().default(""),
+  RESEND_API_KEY: z.string().trim().transform(stripQuotes).default(""),
 
   // Email identity (sender and store info)
-  EMAIL_FROM: z.string().default(""),
-  EMAIL_FROM_NAME: z.string().default("SHADOW SHOP"),
-  ADMIN_EMAIL: z.string().default(""),
-  SUPPORT_EMAIL: z.string().default(""),
+  EMAIL_FROM: z.string().trim().transform(stripQuotes).default(""),
+  EMAIL_FROM_NAME: z.string().trim().transform(stripQuotes).default("SHADOW SHOP"),
+  ADMIN_EMAIL: z.string().trim().transform(stripQuotes).default(""),
+  SUPPORT_EMAIL: z.string().trim().transform(stripQuotes).default(""),
 
   // SMTP (optional fallback)
   SMTP_HOST: z.string().default(""),
@@ -52,9 +61,9 @@ const schema = z.object({
   GAS_WEBHOOK_URL: z.string().default(""),
 
   // Brevo API (Transactional Email)
-  BREVO_API_KEY: z.string().trim().default(""),
-  EMAIL_REPLY_TO: z.string().default(""),
-  ADMIN_NOTIFICATION_EMAIL: z.string().default(""),
+  BREVO_API_KEY: z.string().trim().transform(stripQuotes).default(""),
+  EMAIL_REPLY_TO: z.string().trim().transform(stripQuotes).default(""),
+  ADMIN_NOTIFICATION_EMAIL: z.string().trim().transform(stripQuotes).default(""),
 
   // SMS (separate system)
   SMS_PROVIDER: z.string().default("none"),
@@ -79,6 +88,8 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 // Upload directory is relative to the backend app root (apps/backend/)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 export const uploadDirectory = path.resolve(__dirname, "../../", env.UPLOAD_PATH);
 
 // ============================================================
@@ -102,6 +113,7 @@ function validateEmailConfig() {
     } else {
       console.log(`[EMAIL] Provider: resend`);
       console.log(`[EMAIL] API key configured: YES`);
+      console.log(`[EMAIL] API key format check: ${env.RESEND_API_KEY.startsWith("re_") ? "PASSED" : "WARN (doesn't start with re_)"}`);
       console.log(`[EMAIL] Sender configured: YES (${env.EMAIL_FROM_NAME} <${env.EMAIL_FROM}>)`);
     }
   } else if (provider === "smtp") {
@@ -122,6 +134,7 @@ function validateEmailConfig() {
     } else {
       console.log(`[EMAIL] Provider: brevo`);
       console.log(`[EMAIL] API key configured: YES`);
+      console.log(`[EMAIL] API key format check: ${env.BREVO_API_KEY.startsWith("xkeysib-") ? "PASSED" : "WARN (doesn't start with xkeysib-)"}`);
       console.log(`[EMAIL] Sender configured: YES (${env.EMAIL_FROM_NAME} <${env.EMAIL_FROM}>)`);
     }
   } else if (provider === "gas") {
@@ -144,11 +157,9 @@ function validateEmailConfig() {
 // Run validation at startup
 validateEmailConfig();
 
-// Debug log in development to confirm env values are loaded
-if (env.NODE_ENV === "development") {
-  console.log(`[ENV] Loaded from:`);
-  console.log(`  Root   : ${rootEnvPath}`);
-  console.log(`  Backend: ${backendEnvPath}`);
-  console.log(`[ENV] EMAIL_PROVIDER=${env.EMAIL_PROVIDER}`);
-  console.log(`[ENV] OTP cooldown=${env.OTP_RESEND_COOLDOWN_SECONDS}s | expiry=${env.OTP_EXPIRY_MINUTES}min`);
-}
+console.log(`[ENV] Environment: ${env.NODE_ENV}`);
+console.log(`[ENV] Loaded from:`);
+console.log(`  Root   : ${rootEnvPath} (${fs.existsSync(rootEnvPath) ? "Found" : "Missing"})`);
+console.log(`  Backend: ${backendEnvPath} (${fs.existsSync(backendEnvPath) ? "Found" : "Missing"})`);
+console.log(`[ENV] EMAIL_PROVIDER=${env.EMAIL_PROVIDER}`);
+console.log(`[ENV] OTP cooldown=${env.OTP_RESEND_COOLDOWN_SECONDS}s | expiry=${env.OTP_EXPIRY_MINUTES}min`);

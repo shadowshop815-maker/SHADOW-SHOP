@@ -64,7 +64,11 @@ function isUnrecoverableError(errorMsg: string): boolean {
     "Invalid recipient",
     "RESEND_API_KEY not configured",
     "EMAIL_FROM not configured",
+    "BREVO_API_KEY not configured",
     "invalid api key",
+    "key not found", // Brevo 401
+    "status=401",
+    "status=403",
     "domain is not verified",
     "550",  // Permanent SMTP bounce
     "invalid email address",
@@ -171,6 +175,23 @@ export const processEmailJobs = async (): Promise<void> => {
         payload = JSON.parse(job.payload || "{}");
       } catch {
         payload = {};
+      }
+
+      // ─── Prevent sending expired OTPs if queue was stuck ───
+      if (job.templateId.startsWith("otp_")) {
+        const jobAgeMinutes = (Date.now() - new Date(job.createdAt).getTime()) / 1000 / 60;
+        if (jobAgeMinutes > env.OTP_EXPIRY_MINUTES) {
+          await db.emailJob.update({
+            where: { id: job.id },
+            data: {
+              status: "FAILED" as EmailJobStatus,
+              lastError: "OTP expired in queue before sending",
+              attempts: MAX_JOB_ATTEMPTS, // Prevent retries
+            },
+          });
+          console.warn(`[Email Dispatcher] ⚠️ Job ${job.id} (${job.templateId}) expired in queue and was discarded.`);
+          continue;
+        }
       }
 
       const html = generateEmailHtml(job.templateId, payload);
