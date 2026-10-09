@@ -108,7 +108,7 @@ adminRouter.post("/uploads", upload.single("file"), asyncHandler(async (req, res
     // Fallback to local
     if (!fs.existsSync(uploadDirectory)) fs.mkdirSync(uploadDirectory, { recursive: true });
     fs.writeFileSync(path.join(uploadDirectory, filename), req.file.buffer);
-    url = `${env.BACKEND_URL}/uploads/${filename}`;
+    url = `/uploads/${filename}`;
   }
 
   await audit(req.auth!.id, "MEDIA_UPLOAD", "Upload", filename, { mime: req.file.mimetype, size: req.file.size, url });

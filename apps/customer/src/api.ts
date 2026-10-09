@@ -10,6 +10,9 @@ export const money = (value: number | string) => "₹" + new Intl.NumberFormat("
 
 export const resolveImageUrl = (url?: string | null, fallback = "/assets/product-fallback.svg") => {
   if (!url) return fallback;
+  if (url.includes("localhost:5000/uploads/")) {
+    url = "/uploads/" + url.split("/uploads/")[1];
+  }
   if (url.startsWith("http")) return url;
   if (url.startsWith("/uploads/")) {
     const base = API_URL.replace(/\/api\/v1\/?$/, "");

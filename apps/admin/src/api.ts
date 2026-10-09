@@ -1,2 +1,32 @@
 /// <reference types="vite/client" />
-const API=import.meta.env.VITE_API_URL||"http://localhost:5000/api/v1";export const token=()=>localStorage.getItem("shadow_admin_token");export class ApiError extends Error{constructor(message:string,public code:string,public fields?:Record<string,string[]>){super(message)}}export async function api<T>(path:string,options:RequestInit={}):Promise<T>{const headers=new Headers(options.headers);if(!(options.body instanceof FormData))headers.set("content-type","application/json");const value=token();if(value)headers.set("authorization",`Bearer ${value}`);const response=await fetch(`${API}${path}`,{...options,headers});const payload=await response.json().catch(()=>({success:false,message:"Invalid server response."}));if(!response.ok||!payload.success)throw new ApiError(payload.message||"Request failed.",payload.error?.code||"REQUEST_FAILED",payload.error?.fields);return payload.data as T}export const money=(value:number|string)=>"₹"+new Intl.NumberFormat("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value));export const resolveImageUrl=(url?:string,fallback="/assets/product-fallback.svg")=>{if(!url)return fallback;if(url.startsWith("http://")||url.startsWith("https://")||url.startsWith("data:"))return url;const base=API.replace(/\/api\/v\d+$/,"");return`${base}${url.startsWith("/")?"":"/"}${url}`};
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+export const token = () => localStorage.getItem("shadow_admin_token");
+
+export class ApiError extends Error {
+  constructor(message: string, public code: string, public fields?: Record<string, string[]>) {
+    super(message);
+  }
+}
+
+export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  if (!(options.body instanceof FormData)) headers.set("content-type", "application/json");
+  const value = token();
+  if (value) headers.set("authorization", `Bearer ${value}`);
+  const response = await fetch(`${API}${path}`, { ...options, headers });
+  const payload = await response.json().catch(() => ({ success: false, message: "Invalid server response." }));
+  if (!response.ok || !payload.success) throw new ApiError(payload.message || "Request failed.", payload.error?.code || "REQUEST_FAILED", payload.error?.fields);
+  return payload.data as T;
+}
+
+export const money = (value: number | string) => "₹" + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
+
+export const resolveImageUrl = (url?: string, fallback = "/assets/product-fallback.svg") => {
+  if (!url) return fallback;
+  if (url.includes("localhost:5000/uploads/")) {
+    url = "/uploads/" + url.split("/uploads/")[1];
+  }
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  const base = API.replace(/\/api\/v\d+$/, "");
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+};
