@@ -100,13 +100,30 @@ export function ProductDetail() {
     });
   };
   
+  useEffect(() => {
+    if (data?.product) {
+      const colorImages = data.product.images.filter(i => (i as any).color === color);
+      if (colorImages.length > 0) {
+        setImage(resolveImageUrl(colorImages[0].url));
+      } else {
+        const thumb = data.product.thumbnail || data.product.images[0]?.url || "";
+        setImage(thumb ? resolveImageUrl(thumb) : "");
+      }
+    }
+  }, [color, data]);
+
   if (isLoading) return <Spinner/>; 
   if (error || !data) return <Status error={error}>{null}</Status>; 
   
   const p = data.product; 
-  const gallery = [p.thumbnail, ...p.images.map(i => i.url)]
-    .filter((v, i, a) => v && a.indexOf(v) === i)
-    .map(url => resolveImageUrl(url)); 
+  const colorImages = p.images.filter(i => (i as any).color === color).map(i => i.url);
+  const baseImages = p.images.filter(i => !(i as any).color).map(i => i.url);
+  
+  const rawGallery = colorImages.length > 0 
+    ? [...colorImages, ...baseImages, p.thumbnail]
+    : [p.thumbnail, ...baseImages];
+
+  const gallery = rawGallery.filter((v, i, a) => v && a.indexOf(v) === i).map(url => resolveImageUrl(url));
   const effectivePrice = p.salePrice ?? p.price;
   const discountPercent = p.salePrice && Number(p.price) > 0
     ? Math.round((1 - Number(p.salePrice) / Number(p.price)) * 100) 

@@ -6,22 +6,22 @@ import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Toolbar, Loading, ErrorState, Empty, StatusBadge, Pager, Modal, Field, TextField, Pagination } from "../../components/ui";
 
 export type Category = { id: string; name: string; slug: string; description: string; active: boolean; _count?: { products: number } };
-export type Product = { id: string; name: string; slug: string; shortDescription: string; description: string; categories: Category[]; brand: string; sku: string; price: string; salePrice: string | null; costPrice: string | null; stock: number; lowStockThreshold: number; status: string; featured: boolean; thumbnail: string; images: { url: string }[]; sizes: string[]; colors: string[]; tags: string[]; weight: number | null; shippingInfo: string; returnPolicy: string; hsnCode: string | null; taxProfileId: string | null; taxMode: string; taxProfile?: { id: string; name: string; code: string; rate: number } | null };
+export type Product = { id: string; name: string; slug: string; shortDescription: string; description: string; categories: Category[]; brand: string; sku: string; price: string; salePrice: string | null; costPrice: string | null; stock: number; lowStockThreshold: number; status: string; featured: boolean; thumbnail: string; images: { url: string; color?: string | null }[]; sizes: string[]; colors: string[]; tags: string[]; weight: number | null; shippingInfo: string; returnPolicy: string; hsnCode: string | null; taxProfileId: string | null; taxMode: string; taxProfile?: { id: string; name: string; code: string; rate: number } | null };
 
-const emptyProduct = { name: "", slug: "", shortDescription: "", description: "", categories: "", brand: "SHADOW SHOP", sku: "", price: "", salePrice: "", costPrice: "", stock: "0", lowStockThreshold: "5", status: "DRAFT", featured: false, thumbnail: "", images: "", sizes: "", colors: "", tags: "", weight: "", shippingInfo: "", returnPolicy: "", hsnCode: "", taxProfileId: "", taxMode: "INCLUSIVE" };
+const emptyProduct = { name: "", slug: "", shortDescription: "", description: "", categories: "", brand: "SHADOW SHOP", sku: "", price: "", salePrice: "", costPrice: "", stock: "0", lowStockThreshold: "5", status: "DRAFT", featured: false, thumbnail: "", images: [] as { url: string; color?: string | null }[], sizes: "", colors: "", tags: "", weight: "", shippingInfo: "", returnPolicy: "", hsnCode: "", taxProfileId: "", taxMode: "INCLUSIVE" };
 type ProductForm = typeof emptyProduct;
 
 function ProductEditor({ product, categories, onClose }: { product?: Product; categories: Category[]; onClose: () => void }) {
   const client = useQueryClient();
   const [fileBusy, setFileBusy] = useState(false);
-  const [form, setForm] = useState<ProductForm>(product ? { ...product, price: String(product.price), salePrice: product.salePrice || "", costPrice: product.costPrice || "", stock: String(product.stock), lowStockThreshold: String(product.lowStockThreshold), categories: product.categories.map(c => c.name).join(", "), images: product.images.map(i => i.url).join("\n"), sizes: product.sizes.join(", "), colors: product.colors.join(", "), tags: product.tags.join(", "), weight: product.weight == null ? "" : String(product.weight), hsnCode: product.hsnCode || "", taxProfileId: product.taxProfileId || "", taxMode: product.taxMode || "INCLUSIVE" } : emptyProduct);
+  const [form, setForm] = useState<ProductForm>(product ? { ...product, price: String(product.price), salePrice: product.salePrice || "", costPrice: product.costPrice || "", stock: String(product.stock), lowStockThreshold: String(product.lowStockThreshold), categories: product.categories.map(c => c.name).join(", "), images: product.images, sizes: product.sizes.join(", "), colors: product.colors.join(", "), tags: product.tags.join(", "), weight: product.weight == null ? "" : String(product.weight), hsnCode: product.hsnCode || "", taxProfileId: product.taxProfileId || "", taxMode: product.taxMode || "INCLUSIVE" } : emptyProduct);
 
-  const set = (key: keyof ProductForm, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
+  const set = (key: keyof ProductForm, value: any) => setForm(prev => ({ ...prev, [key]: value }));
 
   const mutation = useMutation({
     mutationFn: () => api(`/admin/products${product ? `/${product.id}` : ""}`, {
       method: product ? "PATCH" : "POST",
-      body: JSON.stringify({ ...form, price: Number(form.price), salePrice: form.salePrice ? Number(form.salePrice) : null, costPrice: form.costPrice ? Number(form.costPrice) : null, stock: Number(form.stock), lowStockThreshold: Number(form.lowStockThreshold), weight: form.weight ? Number(form.weight) : null, hsnCode: form.hsnCode || null, taxProfileId: form.taxProfileId || null, taxMode: form.taxMode || "INCLUSIVE", categories: form.categories.split(",").map(s => s.trim()).filter(Boolean), images: form.images.split("\n").map(s => s.trim()).filter(Boolean), sizes: form.sizes.split(",").map(s => s.trim()).filter(Boolean), colors: form.colors.split(",").map(s => s.trim()).filter(Boolean), tags: form.tags.split(",").map(s => s.trim()).filter(Boolean) })
+      body: JSON.stringify({ ...form, price: Number(form.price), salePrice: form.salePrice ? Number(form.salePrice) : null, costPrice: form.costPrice ? Number(form.costPrice) : null, stock: Number(form.stock), lowStockThreshold: Number(form.lowStockThreshold), weight: form.weight ? Number(form.weight) : null, hsnCode: form.hsnCode || null, taxProfileId: form.taxProfileId || null, taxMode: form.taxMode || "INCLUSIVE", categories: form.categories.split(",").map(s => s.trim()).filter(Boolean), sizes: form.sizes.split(",").map(s => s.trim()).filter(Boolean), colors: form.colors.split(",").map(s => s.trim()).filter(Boolean), tags: form.tags.split(",").map(s => s.trim()).filter(Boolean) })
     }),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["admin-products"] });
@@ -30,7 +30,7 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
     }
   });
 
-  const upload = async (files: FileList | File[], target: "thumbnail" | "gallery") => {
+  const upload = async (files: FileList | File[], target: "thumbnail" | "gallery", color?: string) => {
     setFileBusy(true);
     try {
       const urls: string[] = [];
@@ -43,8 +43,8 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
       if (target === "thumbnail") {
         set("thumbnail", urls[0]);
       } else {
-        const current = form.images.trim();
-        set("images", current ? current + "\n" + urls.join("\n") : urls.join("\n"));
+        const newImages = urls.map(url => ({ url, color: color || null }));
+        set("images", [...form.images, ...newImages]);
       }
     } catch (error) {
       alert((error as Error).message);
@@ -99,24 +99,26 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minWidth: 300 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Gallery Images</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-              {form.images.split("\n").map(s => s.trim()).filter(Boolean).map((url, i) => (
-                <div key={i} style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", flexShrink: 0 }}>
-                  <img src={resolveImageUrl(url)} alt={`Gallery ${i}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                  <button type="button" onClick={() => {
-                    const arr = form.images.split("\n").map(s => s.trim()).filter(Boolean);
-                    arr.splice(i, 1);
-                    set("images", arr.join("\n"));
-                  }} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24, flex: 1, minWidth: 300 }}>
+            {[null, ...form.colors.split(",").map(s => s.trim()).filter(Boolean)].map((col, idx) => (
+              <div key={idx} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>{col ? `${col} Images` : "Base Gallery Images"}</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                  {form.images.filter(img => (img.color || null) === col).map((img, i) => (
+                    <div key={i} style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", flexShrink: 0 }}>
+                      <img src={resolveImageUrl(img.url)} alt={`Gallery`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                      <button type="button" onClick={() => {
+                        set("images", form.images.filter(x => x !== img));
+                      }} style={{ position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                  <label style={{ width: 100, height: 100, border: "2px dashed var(--gold)", color: "var(--gold)", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "rgba(212, 175, 55, 0.05)", transition: "0.2s", flexShrink: 0 }}>
+                    <Upload size={20} /> {fileBusy ? "..." : "Add Photo"}
+                    <input type="file" accept="image/*" multiple onChange={e => e.target.files?.length && void upload(e.target.files, "gallery", col || undefined)} style={{ display: "none" }} disabled={fileBusy} />
+                  </label>
                 </div>
-              ))}
-              <label style={{ width: 100, height: 100, border: "2px dashed var(--gold)", color: "var(--gold)", borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, background: "rgba(212, 175, 55, 0.05)", transition: "0.2s", flexShrink: 0 }}>
-                <Upload size={20} /> {fileBusy ? "..." : "Add Photo"}
-                <input type="file" accept="image/*" multiple onChange={e => e.target.files?.length && void upload(e.target.files, "gallery")} style={{ display: "none" }} disabled={fileBusy} />
-              </label>
-            </div>
+              </div>
+            ))}
           </div>
         </div>
         <div className="form-grid">

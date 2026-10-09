@@ -16,7 +16,7 @@ export const productSchema = z.object({
   description: z.string().min(1), categories: z.array(z.string()).min(1, "Enter at least one category"), brand: z.string().default("SHADOW SHOP"), sku: z.string().trim().min(1).max(80),
   price: z.coerce.number().nonnegative(), salePrice: z.coerce.number().nonnegative().nullable().optional(), costPrice: z.coerce.number().nonnegative().nullable().optional(),
   stock: z.coerce.number().int().nonnegative(), lowStockThreshold: z.coerce.number().int().nonnegative().default(5), status: z.enum(["DRAFT", "ACTIVE", "OUT_OF_STOCK", "ARCHIVED"]),
-  featured: z.boolean().default(false), thumbnail: z.string().default(""), images: z.array(z.string()).default([]), sizes: z.array(z.string()).default([]), colors: z.array(z.string()).default([]),
+  featured: z.boolean().default(false), thumbnail: z.string().default(""), images: z.array(z.object({ url: z.string(), color: z.string().nullable().optional() })).default([]), sizes: z.array(z.string()).default([]), colors: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([]), weight: z.coerce.number().nonnegative().nullable().optional(), shippingInfo: z.string().default(""), returnPolicy: z.string().default(""),
   hsnCode: z.string().nullable().optional(), taxProfileId: z.string().uuid().nullable().optional(), taxMode: z.enum(["INCLUSIVE", "EXCLUSIVE"]).default("INCLUSIVE")
 }).refine((v) => v.salePrice == null || v.salePrice <= v.price, { message: "Sale price cannot exceed regular price", path: ["salePrice"] });
