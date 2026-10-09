@@ -25,7 +25,7 @@ if (fs.existsSync(backendEnvPath)) {
 const stripQuotes = (val: string) => val.replace(/^["']|["']$/g, "");
 
 const schema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z.enum(["development", "test", "production"]).default(process.env.RENDER ? "production" : "development"),
   PORT: z.coerce.number().default(5000),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
