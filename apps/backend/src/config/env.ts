@@ -158,8 +158,12 @@ function validateEmailConfig() {
 validateEmailConfig();
 
 console.log(`[ENV] Environment: ${env.NODE_ENV}`);
-console.log(`[ENV] Loaded from:`);
-console.log(`  Root   : ${rootEnvPath} (${fs.existsSync(rootEnvPath) ? "Found" : "Missing"})`);
-console.log(`  Backend: ${backendEnvPath} (${fs.existsSync(backendEnvPath) ? "Found" : "Missing"})`);
+if (env.NODE_ENV === "production") {
+  console.log(`[ENV] Config Source: Render Environment Variables (No .env needed)`);
+} else {
+  console.log(`[ENV] Loaded from:`);
+  console.log(`  Root   : ${rootEnvPath} (${fs.existsSync(rootEnvPath) ? "Found" : "Missing"})`);
+  console.log(`  Backend: ${backendEnvPath} (${fs.existsSync(backendEnvPath) ? "Found" : "Missing"})`);
+}
 console.log(`[ENV] EMAIL_PROVIDER=${env.EMAIL_PROVIDER}`);
 console.log(`[ENV] OTP cooldown=${env.OTP_RESEND_COOLDOWN_SECONDS}s | expiry=${env.OTP_EXPIRY_MINUTES}min`);
