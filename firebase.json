@@ -29,6 +29,21 @@
           "destination": "/index.html"
         }
       ]
+    },
+    {
+      "target": "shop",
+      "public": "apps/customer/dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
     }
   ]
 }

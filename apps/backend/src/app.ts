@@ -117,6 +117,7 @@ app.use(cors({
     env.ADMIN_URL, 
     "https://shadowshop-82930.web.app", 
     "https://shadowshop-82930-admin.web.app",
+    "https://shadow-shop-official-store.web.app",
     "http://localhost:3000",
     "http://localhost:3001"
   ], 

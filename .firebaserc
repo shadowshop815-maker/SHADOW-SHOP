@@ -11,6 +11,9 @@
         ],
         "admin": [
           "shadowshop-82930-admin"
+        ],
+        "shop": [
+          "shadow-shop-official-store"
         ]
       }
     }
