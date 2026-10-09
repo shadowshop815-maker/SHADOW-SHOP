@@ -133,7 +133,7 @@ export function ProductDetail() {
     <section className="section page" style={{ paddingTop: "30px" }}>
       <div className="product-detail">
         {/* LEFT COLUMN: PRODUCT GALLERY */}
-        <div className="gallery" style={{ position: "sticky", top: "100px", height: "max-content" }}>
+        <div className="gallery">
           <div 
             className="main-image" 
             style={{ 
