@@ -30,6 +30,10 @@ model User {
   auditLogs        AdminAuditLog[]
   offerRedemptions OfferRedemption[]
   wishlists        Wishlist[]
+  reviews          ProductReview[]
+  reviewVotes      ReviewVote[]
+  reviewReplies    ReviewReply[]
+  reviewAudits     ReviewModerationAudit[]
 
   @@index([role])
 }
@@ -120,6 +124,10 @@ model Product {
   taxProfileId      String?
   taxMode           String              @default("INCLUSIVE")
   
+  averageRating     Decimal             @default(0)
+  ratingCount       Int                 @default(0)
+  reviewCount       Int                 @default(0)
+
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   categories        Category[]
@@ -130,10 +138,12 @@ model Product {
   inventory         InventoryMovement[]
   offerRules        OfferProductRule[]
   wishlistItems     WishlistItem[]
+  reviews           ProductReview[]
   taxProfile        TaxProfile?         @relation(fields: [taxProfileId], references: [id])
 
   @@index([status, featured])
-
+  @@index([status, createdAt])
+  @@index([status, salePrice])
   @@index([createdAt])
 }
 
@@ -269,6 +279,7 @@ model Order {
   returns                 ReturnRequest[]
   refunds                 Refund[]
   offerRedemptions        OfferRedemption[]
+  reviews                 ProductReview[]
 
   @@index([customerId, createdAt])
   @@index([orderStatus, createdAt])
@@ -786,4 +797,97 @@ model EmailJob {
 
   @@index([status, scheduledAt])
   @@index([idempotencyKey])
+}
+
+model ProductReview {
+  id               String                  @id @default(uuid())
+  productId        String
+  customerId       String
+  orderId          String?
+  orderItemId      String?
+  rating           Int
+  title            String?
+  comment          String?
+  status           String                  @default("PUBLISHED")
+  isVerified       Boolean                 @default(false)
+  purchasedSize    String?
+  purchasedColor   String?
+  fit              String?
+  fabricQuality    String?
+  comfort          String?
+  helpfulCount     Int                     @default(0)
+  notHelpfulCount  Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  product          Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer         User                    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  order            Order?                  @relation(fields: [orderId], references: [id])
+  images           ReviewImage[]
+  votes            ReviewVote[]
+  replies          ReviewReply[]
+  moderationAudits ReviewModerationAudit[]
+
+  @@unique([productId, customerId])
+  @@index([productId, status, createdAt])
+  @@index([customerId])
+  @@index([status])
+  @@index([rating])
+}
+
+model ReviewImage {
+  id         String        @id @default(uuid())
+  reviewId   String
+  url        String
+  sortOrder  Int           @default(0)
+  createdAt  DateTime      @default(now())
+
+  review     ProductReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId, sortOrder])
+}
+
+model ReviewVote {
+  id         String        @id @default(uuid())
+  reviewId   String
+  customerId String
+  voteType   String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  review     ProductReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  customer   User          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, customerId])
+  @@index([reviewId])
+  @@index([customerId])
+}
+
+model ReviewReply {
+  id         String        @id @default(uuid())
+  reviewId   String
+  adminId    String
+  replyText  String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  review     ProductReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  admin      User          @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+}
+
+model ReviewModerationAudit {
+  id         String        @id @default(uuid())
+  reviewId   String
+  adminId    String
+  action     String
+  reason     String?
+  createdAt  DateTime      @default(now())
+
+  review     ProductReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  admin      User          @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([reviewId])
+  @@index([adminId])
 }

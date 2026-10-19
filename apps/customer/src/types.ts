@@ -1,5 +1,96 @@
 export interface Category { id: string; name: string; slug: string; description: string }
-export interface Product { id: string; slug: string; name: string; shortDescription: string; description: string; brand: string; sku: string; price: string; salePrice: string | null; stock: number; status: string; featured: boolean; thumbnail: string; sizes: string[]; colors: string[]; shippingInfo: string; returnPolicy: string; categories: Category[]; images: { id: string; url: string; alt: string }[] }
+export interface Product { id: string; slug: string; name: string; shortDescription: string; description: string; brand: string; sku: string; price: string; salePrice: string | null; stock: number; status: string; featured: boolean; thumbnail: string; sizes: string[]; colors: string[]; shippingInfo: string; returnPolicy: string; categories: Category[]; images: { id: string; url: string; alt: string }[]; averageRating?: number | string; ratingCount?: number; reviewCount?: number }
+
+export type User = { id: string; name: string; email: string; phone: string | null; role: string; emailVerified?: boolean };
+
+export interface ReviewImageItem { id: string; url: string }
+export interface ReviewReplyItem { id: string; text: string; createdAt: string }
+
+export interface Review {
+  id: string;
+  productId?: string;
+  customerId?: string;
+  customerName?: string;
+  rating: number;
+  title: string;
+  comment: string;
+  isVerified: boolean;
+  isVerifiedPurchase?: boolean;
+  purchasedSize?: string;
+  purchasedColor?: string;
+  sizePurchased?: string;
+  colorPurchased?: string;
+  fit?: string;
+  fabricQuality?: string;
+  comfort?: string;
+  fitFeedback?: string;
+  fabricFeedback?: string;
+  comfortFeedback?: string;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  helpfulVotes?: number;
+  notHelpfulVotes?: number;
+  createdAt: string;
+  updatedAt?: string;
+  author: string;
+  isOwnReview: boolean;
+  userVote: "HELPFUL" | "NOT_HELPFUL" | null;
+  images: ReviewImageItem[];
+  replies?: ReviewReplyItem[];
+  status?: string;
+}
+
+export interface RatingSummary {
+  averageRating: number;
+  totalRatings: number;
+  verifiedBuyerRatings: number;
+  ratingLabel: string;
+  stars: { 1: number; 2: number; 3: number; 4: number; 5: number };
+  starPercentages: { 1: number; 2: number; 3: number; 4: number; 5: number };
+  totalReviewsWithText: number;
+  totalReviewsWithPhotos: number;
+  attributes: {
+    fit: { label: string; count: number; percentage: number }[];
+    fabricQuality: { label: string; count: number; percentage: number }[];
+    comfort: { label: string; count: number; percentage: number }[];
+  };
+}
+
+export interface ReviewEligibility {
+  canReview: boolean;
+  isDeliveredBuyer: boolean;
+  hasExistingReview: boolean;
+  existingReview: {
+    id: string;
+    rating: number;
+    title?: string;
+    comment?: string;
+    fit?: string;
+    fabricQuality?: string;
+    comfort?: string;
+    purchasedSize?: string;
+    purchasedColor?: string;
+    images?: ReviewImageItem[];
+    createdAt?: string;
+  } | null;
+  purchasedSize?: string;
+  purchasedColor?: string;
+  orderId?: string | null;
+  orderItemId?: string | null;
+}
+
+export interface CustomerPhotoItem {
+  id: string;
+  url: string;
+  reviewId: string;
+  rating: number;
+  title?: string;
+  reviewTitle?: string;
+  comment?: string;
+  author: string;
+  customerName?: string;
+  createdAt: string;
+}
 export interface CartItem { id: string; quantity: number; selectedSize: string; selectedColor: string; unitPrice: number; lineTotal: number; product: Product }
 export interface Cart { id: string; items: CartItem[]; appliedOfferCode?: string | null; appliedOffer?: any; totals: { subtotal: number; discount: number; offerDiscount: number; shipping: number; tax: number; grandTotal: number }; shipping?: { baseShippingFee?: number; freeShippingThreshold?: number; freeShippingEligible?: boolean; effectiveBaseShipping?: number; shippingStatus?: "NOT_SELECTED" | "CONFIRMED"; selectedOptionBreakdown?: any; [key: string]: any }; currency: string; deliveryOptionId?: string | null; deliveryOptions?: any[]; deliveryAddressId?: string | null }
 

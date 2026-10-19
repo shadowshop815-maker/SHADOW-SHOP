@@ -22,12 +22,83 @@ export function Products() {
   
   const { data, isLoading, error } = useQuery({
     queryKey: ["products", path],
-    queryFn: () => api<{ items: Product[]; pagination: { page: number; pages: number; total: number } }>(path)
+    queryFn: async () => {
+      try {
+        return await api<{ items: Product[]; pagination: { page: number; pages: number; total: number } }>(path);
+      } catch (err) {
+        try {
+          const res = await fetch("/catalog-snapshot.json");
+          if (res.ok) {
+            const snap = await res.json();
+            let items: any[] = snap?.data?.items || [];
+            
+            if (query) {
+              const q = query.toLowerCase();
+              items = items.filter(it => it.name?.toLowerCase().includes(q) || it.brand?.toLowerCase().includes(q));
+            }
+            if (selectedCategory) {
+              items = items.filter(it => it.categories?.some((c: any) => c.slug === selectedCategory));
+            }
+            if (selectedAvailability === "in-stock") {
+              items = items.filter(it => (it.stock || 0) > 0);
+            } else if (selectedAvailability === "out-of-stock") {
+              items = items.filter(it => (it.stock || 0) === 0);
+            }
+
+            const parseArr = (val: any) => {
+              if (Array.isArray(val)) return val;
+              if (typeof val === "string") {
+                try { return JSON.parse(val); } catch { return []; }
+              }
+              return [];
+            };
+
+            const mapped = items.map(it => ({
+              ...it,
+              sizes: parseArr(it.sizes),
+              colors: parseArr(it.colors),
+              tags: parseArr(it.tags),
+              images: Array.isArray(it.images) ? it.images : []
+            }));
+
+            return {
+              items: mapped as Product[],
+              pagination: { page: 1, pages: 1, total: mapped.length }
+            };
+          }
+        } catch {}
+        return { items: [], pagination: { page: 1, pages: 1, total: 0 } };
+      }
+    }
   }); 
   
   const { data: categories } = useQuery({
     queryKey: ["categories"],
-    queryFn: () => api<Category[]>("/categories")
+    queryFn: async () => {
+      try {
+        return await api<Category[]>("/categories");
+      } catch (err) {
+        try {
+          const res = await fetch("/catalog-snapshot.json");
+          if (res.ok) {
+            const snap = await res.json();
+            const items: any[] = snap?.data?.items || [];
+            const catMap = new Map<string, Category>();
+            for (const it of items) {
+              if (Array.isArray(it.categories)) {
+                for (const c of it.categories) {
+                  if (c?.slug && !catMap.has(c.slug)) {
+                    catMap.set(c.slug, c);
+                  }
+                }
+              }
+            }
+            if (catMap.size > 0) return Array.from(catMap.values());
+          }
+        } catch {}
+        throw err;
+      }
+    }
   }); 
   
   const set = (key: string, value: string) => {
@@ -215,7 +286,7 @@ export function Products() {
         <div className="product-grid">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--card)", border: "1px solid var(--border)" }}>
-              <div style={{ aspectRatio: "4/5", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite" }} />
+              <div style={{ aspectRatio: "1 / 1", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite" }} />
               <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ height: 12, width: "50%", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite", borderRadius: 4 }} />
                 <div style={{ height: 16, width: "80%", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite", borderRadius: 4 }} />

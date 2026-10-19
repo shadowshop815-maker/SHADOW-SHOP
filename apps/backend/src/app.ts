@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import path from "node:path";
+import zlib from "node:zlib";
 import { env, uploadDirectory } from "./config/env.js";
 import { prisma } from "./config/db.js";
 import { authRouter } from "./routes/auth.js";
@@ -14,11 +15,41 @@ import { adminOffersRouter } from "./routes/adminOffers.js";
 import { adminReturnsRouter } from "./routes/adminReturns.js";
 import { returnsRouter } from "./routes/returns.js";
 import { systemRouter } from "./routes/system.js";
+import { reviewsRouter } from "./routes/reviews.js";
+import { adminReviewsRouter } from "./routes/adminReviews.js";
 import { errorHandler } from "./utils/http.js";
 
 export const app = express();
 app.set("trust proxy", 1);
 app.disable("x-powered-by");
+
+// High-Performance Native GZIP Compression Middleware
+app.use((req, res, next) => {
+  const acceptEncoding = req.headers["accept-encoding"] || "";
+  if (!acceptEncoding.includes("gzip") || req.method === "HEAD") {
+    return next();
+  }
+
+  const originalSend = res.send.bind(res);
+  res.send = (body: any): express.Response => {
+    if (body && (typeof body === "string" || Buffer.isBuffer(body))) {
+      const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
+      if (buffer.length > 1024 && !res.getHeader("Content-Encoding")) {
+        zlib.gzip(buffer, (err, compressed) => {
+          if (err) return originalSend(body);
+          res.setHeader("Content-Encoding", "gzip");
+          res.setHeader("Content-Length", compressed.length);
+          res.removeHeader("ETag");
+          return originalSend(compressed);
+        });
+        return res;
+      }
+    }
+    return originalSend(body);
+  };
+
+  next();
+});
 
 // Security: HTTP Method Whitelisting
 const ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -144,7 +175,7 @@ app.use("/api/v1/webhooks", express.raw({ type: 'application/json' }), (req, _re
 // Prevent caching of sensitive API responses (Financial/Auth/Commerce data)
 // Public catalog and content endpoints set their own permissive Cache-Control headers.
 // Note: we use req.originalUrl (full URL) because req.path strips the /api prefix.
-const SENSITIVE_URL_PREFIXES = ["/api/v1/auth", "/api/v1/admin", "/api/v1/cart", "/api/v1/checkout", "/api/v1/orders", "/api/v1/returns", "/api/v1/commerce", "/api/v1/offers"];
+const SENSITIVE_URL_PREFIXES = ["/api/v1/auth", "/api/v1/admin", "/api/v1/cart", "/api/v1/checkout", "/api/v1/orders", "/api/v1/returns", "/api/v1/commerce", "/api/v1/offers", "/api/v1/admin/reviews"];
 app.use("/api", (_req, res, next) => {
   const isSensitive = SENSITIVE_URL_PREFIXES.some(p => _req.originalUrl.startsWith(p));
   if (isSensitive) {
@@ -172,9 +203,11 @@ app.use("/api/v1/auth", rateLimit({ windowMs: 15 * 60_000, limit: 80, standardHe
 app.use("/api/v1", catalogRouter);
 app.use("/api/v1", commerceRouter);
 app.use("/api/v1", contentRouter);
+app.use("/api/v1", reviewsRouter);
 app.use("/api/v1/returns", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: "draft-7", legacyHeaders: false }), returnsRouter);
 app.use("/api/v1/admin/offers", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminOffersRouter);
 app.use("/api/v1/admin/returns", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminReturnsRouter);
+app.use("/api/v1/admin/reviews", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminReviewsRouter);
 app.use("/api/v1/admin", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminRouter);
 app.use("/api/v1/system", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: "draft-7", legacyHeaders: false }), systemRouter);
 app.get("/health", async (_req, res) => { try { await prisma.$queryRaw`SELECT 1`; res.json({ success: true, service: "SHADOW SHOP API", database: "connected" }); } catch { res.status(503).json({ success: false, service: "SHADOW SHOP API", database: "disconnected" }); } });

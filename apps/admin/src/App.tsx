@@ -10,6 +10,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Products } from "./pages/catalog/Products";
 import { Categories } from "./pages/catalog/Categories";
 import { Inventory } from "./pages/catalog/Inventory";
+import { Reviews } from "./pages/catalog/Reviews";
 import { Orders } from "./pages/sales/Orders";
 import { Cancellations } from "./pages/sales/Cancellations";
 import { Returns } from "./pages/sales/Returns";
@@ -40,6 +41,7 @@ function Guarded() {
         <Route path="/products" element={<Products />} />
         <Route path="/categories" element={<Categories />} />
         <Route path="/inventory" element={<Inventory />} />
+        <Route path="/reviews" element={<Reviews />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/cancellations" element={<Cancellations />} />
         <Route path="/returns" element={<Returns />} />

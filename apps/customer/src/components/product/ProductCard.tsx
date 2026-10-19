@@ -4,6 +4,7 @@ import { Heart, ShoppingBag, Check, ArrowRight } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, money, resolveImageUrl } from "../../api";
 import type { Product } from "../../types";
+import { RatingBadge } from "../reviews/RatingStars";
 
 export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const navigate = useNavigate();
@@ -61,7 +62,9 @@ export function ProductCard({ product, priority = false }: { product: Product; p
     }
   };
 
-  const hasVariants = (product.sizes && product.sizes.length > 0) || (product.colors && product.colors.length > 0);
+  const parsedSizes = Array.isArray(product.sizes) ? product.sizes : (typeof product.sizes === "string" ? (() => { try { return JSON.parse(product.sizes); } catch { return []; } })() : []);
+  const parsedColors = Array.isArray(product.colors) ? product.colors : (typeof product.colors === "string" ? (() => { try { return JSON.parse(product.colors); } catch { return []; } })() : []);
+  const hasVariants = (parsedSizes && parsedSizes.length > 0) || (parsedColors && parsedColors.length > 0);
   const secondaryImage = product.images && product.images.length > 1 ? resolveImageUrl(product.images[1]?.url) : null;
   const primaryImage = resolveImageUrl(product.thumbnail || product.images?.[0]?.url);
 
@@ -107,10 +110,24 @@ export function ProductCard({ product, priority = false }: { product: Product; p
     }
   };
 
+  const prefetchProduct = () => {
+    if (!product.slug) return;
+    queryClient.prefetchQuery({
+      queryKey: ["product", product.slug],
+      queryFn: () => api<{ product: Product; related: Product[] }>(`/products/${product.slug}`),
+      staleTime: 5 * 60_000
+    });
+  };
+
   return (
-    <article className="product-card" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Image Container */}
-      <div className="product-image-wrap">
+    <article 
+      className="product-card" 
+      onMouseEnter={prefetchProduct}
+      onFocus={prefetchProduct}
+      style={{ height: "100%", display: "flex", flexDirection: "column" }}
+    >
+      {/* Image Container with fixed 1:1 aspect ratio to guarantee zero CLS */}
+      <div className="product-image-wrap" style={{ aspectRatio: "1 / 1", position: "relative", overflow: "hidden" }}>
         <Link to={`/products/${product.slug}`} style={{ display: "block", width: "100%", height: "100%" }}>
           <img
             src={primaryImage}
@@ -118,6 +135,13 @@ export function ProductCard({ product, priority = false }: { product: Product; p
             className={`product-image-primary ${secondaryImage ? "has-secondary" : ""}`}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
+            decoding="async"
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.includes("product-fallback.svg")) {
+                target.src = "/assets/product-fallback.svg";
+              }
+            }}
           />
           {secondaryImage && (
             <img
@@ -125,6 +149,13 @@ export function ProductCard({ product, priority = false }: { product: Product; p
               alt={`${product.name} alternate view`}
               className="product-image-secondary"
               loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.includes("product-fallback.svg")) {
+                  target.src = "/assets/product-fallback.svg";
+                }
+              }}
             />
           )}
         </Link>
@@ -137,6 +168,12 @@ export function ProductCard({ product, priority = false }: { product: Product; p
             </span>
           )}
         </div>
+
+        {Number(product.averageRating) > 0 && (
+          <div style={{ position: "absolute", bottom: 14, left: 14, zIndex: 9 }}>
+            <RatingBadge rating={product.averageRating} size="sm" />
+          </div>
+        )}
 
         {product.stock === 0 && (
           <span className="sold">Out of stock</span>

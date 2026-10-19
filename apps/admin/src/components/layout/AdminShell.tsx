@@ -4,14 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { 
   LayoutDashboard, ShoppingBag, Tags, Boxes, ClipboardList, X, 
   RotateCcw, RefreshCw, Users, Newspaper, Image, MessageSquareMore, 
-  Settings, ShieldAlert, BarChart3, Menu, Sun, Moon, LogOut, Receipt, Mail
+  Settings, ShieldAlert, BarChart3, Menu, Sun, Moon, LogOut, Receipt, Mail, Star
 } from "lucide-react";
 import { useAuth } from "../../features/auth/AuthContext";
 import { api, resolveImageUrl } from "../../api";
 
 const nav = [
   { label: "Dashboard", items: [["/", LayoutDashboard, "Overview"]] },
-  { label: "Catalog", items: [["/products", ShoppingBag, "Products"], ["/categories", Tags, "Categories"], ["/inventory", Boxes, "Inventory"]] },
+  { label: "Catalog", items: [["/products", ShoppingBag, "Products"], ["/categories", Tags, "Categories"], ["/inventory", Boxes, "Inventory"], ["/reviews", Star, "Reviews"]] },
   { label: "Sales", items: [["/orders", ClipboardList, "Orders"], ["/cancellations", X, "Cancellations"], ["/returns", RotateCcw, "Returns"], ["/refunds", RefreshCw, "Refunds"]] },
   { label: "Customers", items: [["/customers", Users, "All customers"]] },
   { label: "Content", items: [["/updates", Newspaper, "Updates"], ["/media", Image, "Media"], ["/newsletter", MessageSquareMore, "Newsletter"]] },

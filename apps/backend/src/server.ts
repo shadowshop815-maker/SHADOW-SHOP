@@ -34,6 +34,10 @@ async function start() {
     // Connect to DB asynchronously in the background
     connectWithRetry(15).then(() => {
       console.log("✓ Database connected");
+      // Initialize Review & Rating tables idempotently
+      import("./services/reviewDbInit.js").then((mod) => {
+        mod.initReviewDatabase().catch((err) => console.error("Review DB init error:", err));
+      });
       // Start Background Workers
       import("./services/email/dispatcher.js").then((mod) => {
         mod.startEmailDispatcher();

@@ -84,6 +84,7 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
           
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Thumbnail Image</label>
+            <span style={{ fontSize: 10, color: "var(--ink-secondary)", maxWidth: 200, lineHeight: 1.3 }}>Square 1:1 format, clean product/model photo without embedded text recommended</span>
             <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
               {form.thumbnail ? (
                 <div style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: "1px solid var(--border)", flexShrink: 0 }}>

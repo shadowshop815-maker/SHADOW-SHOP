@@ -105,6 +105,16 @@ export function Shell({ children }: { children: ReactNode }) {
     }
   }, [cartItemCount]);
 
+  const [serverWaking, setServerWaking] = useState(false);
+
+  useEffect(() => {
+    const handleWaking = (e: any) => {
+      setServerWaking(Boolean(e.detail?.waking));
+    };
+    window.addEventListener("shadow_server_waking", handleWaking);
+    return () => window.removeEventListener("shadow_server_waking", handleWaking);
+  }, []);
+
   const name = settings?.branding.storeName || "SHADOW SHOP";
   const freeShippingThreshold = cart?.shipping?.freeShippingThreshold ?? 500;
   const isFreeShippingEnabled = cart?.shipping?.freeShippingEnabled ?? true;
@@ -112,6 +122,28 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="site">
+      {/* Cold Start Indicator: Non-intrusive wake-up banner */}
+      {serverWaking && (
+        <div style={{
+          background: "linear-gradient(90deg, #141418 0%, #1a1a22 100%)",
+          color: "var(--gold, #d4af37)",
+          borderBottom: "1px solid rgba(212, 175, 55, 0.3)",
+          padding: "6px 16px",
+          fontSize: "12px",
+          fontWeight: 600,
+          textAlign: "center",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "8px",
+          position: "relative",
+          zIndex: 96
+        }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold, #d4af37)", display: "inline-block" }} />
+          <span>Connecting to live services... Your shopping catalog is available.</span>
+        </div>
+      )}
+
       {/* Store Closed Banner if Admin sets store.isOpen = false */}
       {settings?.store && settings.store.isOpen === false && (
         <div style={{
@@ -145,7 +177,7 @@ export function Shell({ children }: { children: ReactNode }) {
           position: "sticky",
           top: 0,
           zIndex: 80,
-          padding: scrolled ? "8px 20px" : "14px 20px",
+          padding: scrolled ? "8px var(--container-pad)" : "14px var(--container-pad)",
           background: scrolled
             ? "color-mix(in srgb, var(--bg) 85%, transparent)"
             : "transparent",

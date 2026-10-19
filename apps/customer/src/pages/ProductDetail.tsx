@@ -7,6 +7,9 @@ import { useAuth } from "../features/auth/AuthContext";
 import type { Product } from "../types";
 import { Spinner, Status } from "../components/ui";
 import { ProductCard } from "../components/product/ProductCard";
+import { RatingBadge } from "../components/reviews/RatingStars";
+import { ReviewSection } from "../components/reviews/ReviewSection";
+import { fetchRatingSummary } from "../services/reviewStore";
 import { Reveal, AnimatedPrice, StaggerContainer, StaggerItem } from "../components/motion/Motion";
 
 export function ProductDetail() { 
@@ -18,9 +21,55 @@ export function ProductDetail() {
   
   const { data, isLoading, error } = useQuery({
     queryKey: ["product", slug],
-    queryFn: () => api<{ product: Product; related: Product[] }>(`/products/${slug}`)
+    queryFn: async () => {
+      try {
+        return await api<{ product: Product; related: Product[] }>(`/products/${slug}`);
+      } catch (err) {
+        try {
+          const snapRes = await fetch("/catalog-snapshot.json");
+          if (snapRes.ok) {
+            const snapshot = await snapRes.json();
+            const items: any[] = snapshot?.data?.items || [];
+            const found = items.find((it: any) => it.slug === slug || it.id === slug) || items[0];
+            if (found) {
+              const related = items.filter((it: any) => it.id !== found.id);
+              const parseArr = (val: any) => {
+                if (Array.isArray(val)) return val;
+                if (typeof val === "string") {
+                  try { return JSON.parse(val); } catch { return []; }
+                }
+                return [];
+              };
+              return {
+                product: {
+                  ...found,
+                  sizes: parseArr(found.sizes),
+                  colors: parseArr(found.colors),
+                  tags: parseArr(found.tags),
+                  images: Array.isArray(found.images) ? found.images : []
+                } as Product,
+                related: related.map((r: any) => ({
+                  ...r,
+                  sizes: parseArr(r.sizes),
+                  colors: parseArr(r.colors),
+                  tags: parseArr(r.tags),
+                  images: Array.isArray(r.images) ? r.images : []
+                })) as Product[]
+              };
+            }
+          }
+        } catch {}
+        throw err;
+      }
+    }
   }); 
   
+  const { data: summaryData } = useQuery({
+    queryKey: ["product-rating-summary", slug],
+    queryFn: () => fetchRatingSummary(slug!),
+    enabled: Boolean(slug),
+  });
+
   const [image, setImage] = useState(""); 
   const [size, setSize] = useState(""); 
   const [color, setColor] = useState(""); 
@@ -141,7 +190,7 @@ export function ProductDetail() {
       <div className="product-detail">
         {/* Skeleton gallery */}
         <div className="gallery">
-          <div className="main-image" style={{ borderRadius: "var(--radius-xl)", overflow: "hidden", background: "var(--layer-2)", animation: "shimmer 1.8s infinite", minHeight: 480 }} />
+          <div className="main-image" style={{ borderRadius: "var(--radius-xl)", overflow: "hidden", background: "var(--layer-2)", animation: "shimmer 1.8s infinite", aspectRatio: "1 / 1", width: "100%", height: "auto" }} />
         </div>
         {/* Skeleton copy */}
         <div className="detail-copy" style={{ padding: "10px 0 60px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -170,6 +219,10 @@ export function ProductDetail() {
     ? Math.round((1 - Number(p.salePrice) / Number(p.price)) * 100) 
     : 0; 
   
+  const effectiveAverageRating = summaryData ? summaryData.averageRating : Number(p.averageRating || 0);
+  const effectiveRatingCount = summaryData ? summaryData.totalRatings : Number(p.ratingCount || 0);
+  const effectiveReviewCount = summaryData ? (summaryData.totalReviewsWithText || summaryData.totalRatings) : Number(p.reviewCount || 0);
+  
   return (
     <section className="section page" style={{ paddingTop: "30px" }}>
       <div className="product-detail">
@@ -183,17 +236,25 @@ export function ProductDetail() {
               position: "relative",
               background: "var(--card)",
               border: "1px solid var(--border)",
-              boxShadow: "var(--shadow-md)"
+              boxShadow: "var(--shadow-md)",
+              aspectRatio: "1 / 1",
+              width: "100%",
+              height: "auto",
+              padding: 0
             }}
           >
             <img 
               src={image || "/assets/product-fallback.svg"} 
               alt={p.name} 
+              loading="eager"
+              fetchPriority="high"
+              decoding="async"
               onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
               style={{
                 width: "100%",
                 height: "100%",
                 objectFit: "contain",
+                padding: 0,
                 transition: "opacity 0.3s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)"
               }}
             />
@@ -206,6 +267,21 @@ export function ProductDetail() {
                 </span>
               )}
             </div>
+
+            {/* Flipkart-Style Rating Badge on Hero Image */}
+            {effectiveAverageRating > 0 && effectiveRatingCount > 0 && (
+              <div style={{ position: "absolute", bottom: 20, left: 20, zIndex: 5 }}>
+                <a
+                  href="#customer-reviews"
+                  className="hero-image-rating-pill"
+                  title="View ratings and reviews"
+                >
+                  <RatingBadge rating={effectiveAverageRating} size="sm" />
+                  <span style={{ opacity: 0.5 }}>|</span>
+                  <span>{effectiveRatingCount > 999 ? `${(effectiveRatingCount / 1000).toFixed(1)}k+` : `${effectiveRatingCount} rating${effectiveRatingCount !== 1 ? "s" : ""}`}</span>
+                </a>
+              </div>
+            )}
 
             {p.stock === 0 && (
               <span className="sold" style={{ padding: "14px 26px", fontSize: "13px", fontWeight: 800 }}>
@@ -247,7 +323,7 @@ export function ProductDetail() {
                     transition: "all 0.2s ease"
                   }}
                 >
-                  <img src={src} alt="Thumbnail preview" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 6 }} />
+                  <img src={src} alt="Thumbnail preview" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", padding: 0 }} />
                 </button>
               ))}
             </div>
@@ -267,6 +343,40 @@ export function ProductDetail() {
               {p.name}
             </h1>
           </Reveal>
+
+          {/* Flipkart-Style Rating & Review Count Header */}
+          {effectiveAverageRating > 0 && effectiveRatingCount > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "0 0 16px" }}>
+              <RatingBadge rating={effectiveAverageRating} size="md" />
+              <a
+                href="#customer-reviews"
+                style={{
+                  fontSize: "13px",
+                  color: "var(--muted)",
+                  textDecoration: "underline",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {effectiveRatingCount.toLocaleString("en-IN")} Rating{effectiveRatingCount !== 1 ? "s" : ""} &amp; {effectiveReviewCount.toLocaleString("en-IN")} Review{effectiveReviewCount !== 1 ? "s" : ""}
+              </a>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 0 16px" }}>
+              <a
+                href="#customer-reviews"
+                style={{
+                  fontSize: "13px",
+                  color: "var(--muted)",
+                  textDecoration: "underline",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                No ratings yet · Be the first to review
+              </a>
+            </div>
+          )}
 
           {/* Pricing & GST Notice */}
           <Reveal direction="up" delay={150}>
@@ -490,27 +600,36 @@ export function ProductDetail() {
         </div>
       </div>
 
-      {/* Related Products Grid */}
+      {/* ── RATINGS & REVIEWS SECTION (Flipkart Inspired) ─────────── */}
+      <ReviewSection
+        slug={p.slug}
+        productId={p.id}
+        productName={p.name}
+        productThumbnail={p.thumbnail || p.images[0]?.url}
+      />
+
+      {/* ── SIMILAR PRODUCTS RAIL (Flipkart Inspired) ─────────────── */}
       {data.related && data.related.length > 0 && (
-        <div className="related" style={{ marginTop: "80px" }}>
-          <div className="section-head">
+        <section className="similar-products-section" style={{ marginTop: "70px" }}>
+          <div className="section-head" style={{ marginBottom: "28px" }}>
             <div>
-              <span className="eyebrow">RECOMMENDED</span>
-              <h2>You May Also Like</h2>
+              <span className="eyebrow">CURATED FOR YOU</span>
+              <h2>Similar Products</h2>
             </div>
-            <Link to="/products" className="button ghost">
+            <Link to="/products" className="similar-products-arrow-btn" aria-label="View all similar products">
               <span>View All</span>
-              <ArrowRight size={16} />
+              <ArrowRight size={18} />
             </Link>
           </div>
-          <StaggerContainer className="product-grid">
-            {data.related.slice(0, 4).map((relProduct, idx) => (
-              <StaggerItem key={relProduct.id} index={idx}>
+
+          <div className="similar-products-rail">
+            {data.related.map((relProduct) => (
+              <div key={relProduct.id} className="similar-product-item">
                 <ProductCard product={relProduct} />
-              </StaggerItem>
+              </div>
             ))}
-          </StaggerContainer>
-        </div>
+          </div>
+        </section>
       )}
     </section>
   ); 
