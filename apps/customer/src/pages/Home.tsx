@@ -33,12 +33,45 @@ export function Home() {
 
   const { data: settings } = useQuery({
     queryKey: ["settings"],
-    queryFn: () => api<StoreData>("/settings"),
+    queryFn: async () => {
+      try {
+        return await api<StoreData>("/settings");
+      } catch {
+        try {
+          const snapRes = await fetch("/settings-snapshot.json");
+          if (snapRes.ok) {
+            const snap = await snapRes.json();
+            return snap?.data;
+          }
+        } catch {}
+      }
+    },
   });
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["products", "home"],
-    queryFn: () => api<{ items: Product[] }>("/products?sort=featured&limit=8"),
+    queryFn: async () => {
+      try {
+        const res = await api<{ items: Product[] }>("/products?sort=featured&limit=8");
+        if (res?.items && res.items.length >= 4) {
+          return res;
+        }
+      } catch (err) {
+        console.warn("API products load failed, falling back to snapshot", err);
+      }
+      try {
+        const snapRes = await fetch("/catalog-snapshot.json");
+        if (snapRes.ok) {
+          const snap = await snapRes.json();
+          if (snap?.data?.items?.length) {
+            return snap.data;
+          }
+        }
+      } catch (err) {
+        console.warn("Snapshot load failed", err);
+      }
+      return { items: [] };
+    },
   });
 
   const { data: updates } = useQuery({

@@ -335,11 +335,11 @@ export function Account() {
                           }}
                         >
                           <img
-                            src={resolveImageUrl(item.productThumbnail || "/assets/product-fallback.svg")}
+                            src={resolveImageUrl(item.productThumbnail)}
                             alt={item.productName}
-                            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "cover" }}
                             onError={(e) => {
-                              e.currentTarget.src = "/assets/product-fallback.svg";
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80";
                             }}
                           />
                         </div>
@@ -495,11 +495,11 @@ export function Account() {
                             }}
                           >
                             <img
-                              src={resolveImageUrl(rev.productThumbnail || "/assets/product-fallback.svg")}
+                              src={resolveImageUrl(rev.productThumbnail)}
                               alt={rev.productName}
-                              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "cover" }}
                               onError={(e) => {
-                                e.currentTarget.src = "/assets/product-fallback.svg";
+                                e.currentTarget.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80";
                               }}
                             />
                           </div>

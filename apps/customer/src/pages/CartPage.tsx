@@ -128,10 +128,10 @@ export function CartPage() {
                     <article className="cart-item" key={item.id} style={{ alignItems: "center" }}>
                       <Link to={`/products/${item.product.slug}`} style={{ display: "block" }}>
                         <img 
-                          src={resolveImageUrl(item.product.thumbnail || "/assets/product-fallback.svg")} 
+                          src={resolveImageUrl(item.product.thumbnail)} 
                           alt={item.product.name}
-                          onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
-                          style={{ borderRadius: "var(--radius-md)", objectFit: "contain", background: "var(--layer-2)", padding: 8 }}
+                          onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"; }}
+                          style={{ borderRadius: "var(--radius-md)", objectFit: "cover", background: "var(--layer-2)" }}
                         />
                       </Link>
 

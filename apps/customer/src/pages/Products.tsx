@@ -24,51 +24,57 @@ export function Products() {
     queryKey: ["products", path],
     queryFn: async () => {
       try {
-        return await api<{ items: Product[]; pagination: { page: number; pages: number; total: number } }>(path);
+        const res = await api<{ items: Product[]; pagination: { page: number; pages: number; total: number } }>(path);
+        if (res?.items && res.items.length >= 4) {
+          return res;
+        }
       } catch (err) {
-        try {
-          const res = await fetch("/catalog-snapshot.json");
-          if (res.ok) {
-            const snap = await res.json();
-            let items: any[] = snap?.data?.items || [];
-            
-            if (query) {
-              const q = query.toLowerCase();
-              items = items.filter(it => it.name?.toLowerCase().includes(q) || it.brand?.toLowerCase().includes(q));
-            }
-            if (selectedCategory) {
-              items = items.filter(it => it.categories?.some((c: any) => c.slug === selectedCategory));
-            }
-            if (selectedAvailability === "in-stock") {
-              items = items.filter(it => (it.stock || 0) > 0);
-            } else if (selectedAvailability === "out-of-stock") {
-              items = items.filter(it => (it.stock || 0) === 0);
-            }
-
-            const parseArr = (val: any) => {
-              if (Array.isArray(val)) return val;
-              if (typeof val === "string") {
-                try { return JSON.parse(val); } catch { return []; }
-              }
-              return [];
-            };
-
-            const mapped = items.map(it => ({
-              ...it,
-              sizes: parseArr(it.sizes),
-              colors: parseArr(it.colors),
-              tags: parseArr(it.tags),
-              images: Array.isArray(it.images) ? it.images : []
-            }));
-
-            return {
-              items: mapped as Product[],
-              pagination: { page: 1, pages: 1, total: mapped.length }
-            };
-          }
-        } catch {}
-        return { items: [], pagination: { page: 1, pages: 1, total: 0 } };
+        // Fallback to static snapshot
       }
+
+      try {
+        const res = await fetch("/catalog-snapshot.json");
+        if (res.ok) {
+          const snap = await res.json();
+          let items: any[] = snap?.data?.items || [];
+
+          if (query) {
+            const q = query.toLowerCase();
+            items = items.filter(it => it.name?.toLowerCase().includes(q) || it.brand?.toLowerCase().includes(q));
+          }
+          if (selectedCategory) {
+            items = items.filter(it => it.categories?.some((c: any) => c.slug === selectedCategory));
+          }
+          if (selectedAvailability === "in-stock") {
+            items = items.filter(it => (it.stock || 0) > 0);
+          } else if (selectedAvailability === "out-of-stock") {
+            items = items.filter(it => (it.stock || 0) === 0);
+          }
+
+          const parseArr = (val: any) => {
+            if (Array.isArray(val)) return val;
+            if (typeof val === "string") {
+              try { return JSON.parse(val); } catch { return []; }
+            }
+            return [];
+          };
+
+          const mapped = items.map(it => ({
+            ...it,
+            sizes: parseArr(it.sizes),
+            colors: parseArr(it.colors),
+            tags: parseArr(it.tags),
+            images: Array.isArray(it.images) ? it.images : []
+          }));
+
+          return {
+            items: mapped as Product[],
+            pagination: { page: 1, pages: 1, total: mapped.length }
+          };
+        }
+      } catch {}
+
+      return { items: [], pagination: { page: 1, pages: 1, total: 0 } };
     }
   }); 
   

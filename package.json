@@ -13,6 +13,7 @@
     "db:studio": "npm run db:studio -w @shadow/backend",
     "db:validate": "npm run db:validate -w @shadow/backend",
     "clear-demo": "tsx scripts/clear-demo.ts",
+    "seed:catalog": "tsx scripts/seed-real-catalog.ts",
     "generate-snapshots": "tsx scripts/generate-snapshots.ts",
     "set-admin": "tsx scripts/set-admin.ts",
     "db:indexes": "tsx scripts/apply-indexes.ts"

@@ -138,8 +138,8 @@ export function ProductCard({ product, priority = false }: { product: Product; p
             decoding="async"
             onError={(e) => {
               const target = e.currentTarget;
-              if (!target.src.includes("product-fallback.svg")) {
-                target.src = "/assets/product-fallback.svg";
+              if (!target.src.includes("photo-1596755094514")) {
+                target.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80";
               }
             }}
           />
@@ -152,8 +152,8 @@ export function ProductCard({ product, priority = false }: { product: Product; p
               decoding="async"
               onError={(e) => {
                 const target = e.currentTarget;
-                if (!target.src.includes("product-fallback.svg")) {
-                  target.src = "/assets/product-fallback.svg";
+                if (!target.src.includes("photo-1596755094514")) {
+                  target.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80";
                 }
               }}
             />

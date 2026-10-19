@@ -244,12 +244,12 @@ export function ProductDetail() {
             }}
           >
             <img 
-              src={image || "/assets/product-fallback.svg"} 
+              src={image || "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"} 
               alt={p.name} 
               loading="eager"
               fetchPriority="high"
               decoding="async"
-              onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
+              onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"; }}
               style={{
                 width: "100%",
                 height: "100%",

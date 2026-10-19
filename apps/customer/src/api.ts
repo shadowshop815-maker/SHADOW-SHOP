@@ -129,8 +129,34 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
 export const money = (value: number | string) =>
   "₹" + new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
 
-export const resolveImageUrl = (url?: string | null, fallback = "/assets/product-fallback.svg") => {
-  if (!url) return fallback;
+const STUDIO_PHOTO_MAP: Record<string, string> = {
+  "noir-overshirt": "https://images.unsplash.com/photo-1620012253295-c15c429f66bf?auto=format&fit=crop&w=800&q=80",
+  "heavy-tee": "https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=800&q=80",
+  "product-fallback": "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80",
+  "eclipse-cap": "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=800&q=80",
+  "shadow-runner": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80",
+  "orbit-bag": "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=800&q=80",
+  "mono-slide": "https://images.unsplash.com/photo-1603808033192-082d6919d3e1?auto=format&fit=crop&w=800&q=80"
+};
+
+const DEFAULT_STUDIO_FALLBACK = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80";
+
+export const resolveImageUrl = (url?: string | null, fallback = DEFAULT_STUDIO_FALLBACK) => {
+  if (!url || String(url).trim() === "") return fallback;
+
+  // Intercept old promotional flyer graphic stamped with conflicting price text
+  if (url.includes("1791542599420-508515da-74a5-4c0a-8afb-6e6fb1d1f993")) {
+    return DEFAULT_STUDIO_FALLBACK;
+  }
+
+  // Intercept demo vector SVGs and map to studio photography
+  if (url.includes(".svg")) {
+    for (const [key, photo] of Object.entries(STUDIO_PHOTO_MAP)) {
+      if (url.includes(key)) return photo;
+    }
+    return fallback;
+  }
+
   if (url.includes("localhost:5000/uploads/")) {
     url = "/uploads/" + url.split("/uploads/")[1];
   }
@@ -141,3 +167,4 @@ export const resolveImageUrl = (url?: string | null, fallback = "/assets/product
   }
   return url;
 };
+

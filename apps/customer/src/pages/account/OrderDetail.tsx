@@ -229,10 +229,10 @@ export function OrderDetail() {
                     padding: "6px" 
                   }}>
                     <img 
-                      src={resolveImageUrl(i.productImageSnapshot || "/assets/product-fallback.svg")} 
+                      src={resolveImageUrl(i.productImageSnapshot)} 
                       alt={i.productNameSnapshot} 
-                      onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }}
-                      style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} 
+                      onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"; }}
+                      style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "cover" }} 
                     />
                   </div>
 

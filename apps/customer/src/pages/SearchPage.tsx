@@ -164,7 +164,7 @@ export function SearchPage() {
                       }}
                     >
                       <div style={{ width: 84, height: 84, borderRadius: 12, overflow: "hidden", background: "var(--layer-2)", flexShrink: 0, padding: 6 }}>
-                        <img src={resolveImageUrl(p.thumbnail || "/assets/product-fallback.svg")} alt={p.name} onError={(e) => { e.currentTarget.src = "/assets/product-fallback.svg"; }} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                        <img src={resolveImageUrl(p.thumbnail)} alt={p.name} onError={(e) => { e.currentTarget.src = "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80"; }} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
                         <span style={{ fontSize: "11px", color: "var(--gold)", fontWeight: 700, textTransform: "uppercase" }}>
