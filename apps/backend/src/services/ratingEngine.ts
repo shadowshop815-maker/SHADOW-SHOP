@@ -48,7 +48,7 @@ export function getRatingLabel(rating: number): string {
  */
 export async function recalculateProductRating(
   productId: string,
-  client: Prisma.TransactionClient | typeof prisma = prisma
+  client: any = prisma
 ): Promise<{ averageRating: number; ratingCount: number; reviewCount: number }> {
   // Query all published ratings for this product
   const rows: { rating: number; has_text: boolean }[] = await client.$queryRaw`

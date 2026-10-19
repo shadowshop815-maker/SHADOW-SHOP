@@ -400,7 +400,7 @@ reviewsRouter.post(
     const orderItem = deliveredOrder.items[0];
 
     // Transactionally create review and update aggregates
-    const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const created = await prisma.$transaction(async (tx: any) => {
       const review = await tx.productReview.create({
         data: {
           productId,
@@ -471,7 +471,7 @@ reviewsRouter.put(
     const trimmedTitle = title !== undefined ? String(title).trim().slice(0, 150) : existing.title;
     const trimmedComment = comment !== undefined ? String(comment).trim().slice(0, 3000) : existing.comment;
 
-    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const updated = await prisma.$transaction(async (tx: any) => {
       // If images array is provided, replace images
       if (Array.isArray(images)) {
         await tx.reviewImage.deleteMany({ where: { reviewId } });
@@ -549,7 +549,7 @@ reviewsRouter.post(
       throw new AppError(400, "You cannot vote on your own review.", "SELF_VOTE_NOT_ALLOWED");
     }
 
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Upsert the customer's vote
       await tx.reviewVote.upsert({
         where: { reviewId_customerId: { reviewId, customerId } },
@@ -585,7 +585,7 @@ reviewsRouter.delete(
     const customerId = req.auth!.id;
     const reviewId = String(req.params.id || "");
 
-    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       await tx.reviewVote.deleteMany({
         where: { reviewId, customerId },
       });
@@ -691,7 +691,7 @@ reviewsRouter.get(
         images: true,
       },
     });
-    const reviewByProductId = new Map(existingReviews.map((r: any) => [r.productId, r]));
+    const reviewByProductId = new Map<string, any>(existingReviews.map((r: any) => [r.productId, r]));
 
     // Map unique products from delivered orders
     const seenProductIds = new Set<string>();
@@ -708,7 +708,7 @@ reviewsRouter.get(
 
         if (!seenProductIds.has(item.productId)) {
           seenProductIds.add(item.productId);
-          const existingRev = reviewByProductId.get(item.productId);
+          const existingRev: any = reviewByProductId.get(item.productId);
 
           eligibleItems.push({
             orderId: order.id,
@@ -731,7 +731,7 @@ reviewsRouter.get(
                   comment: existingRev.comment || "",
                   status: existingRev.status,
                   createdAt: existingRev.createdAt,
-                  images: existingRev.images.map((i: any) => ({ id: i.id, url: i.url })),
+                  images: (existingRev.images || []).map((i: any) => ({ id: i.id, url: i.url })),
                 }
               : null,
           });

@@ -53,7 +53,7 @@ adminReviewsRouter.get(
     const productId = String(req.query.productId || "").trim();
     const search = String(req.query.search || "").trim();
 
-    const where: Prisma.ProductReviewWhereInput = {
+    const where: any = {
       ...(status && status !== "ALL" ? { status: status as never } : {}),
       ...(rating ? { rating } : {}),
       ...(productId ? { productId } : {}),
@@ -129,7 +129,7 @@ adminReviewsRouter.patch(
 
     const previousStatus = review.status;
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await prisma.$transaction(async (tx: any) => {
       // 1. Update review status
       await tx.productReview.update({
         where: { id: reviewId },
@@ -209,7 +209,7 @@ adminReviewsRouter.delete(
 
     if (!image) throw new AppError(404, "Review image not found.", "NOT_FOUND");
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.reviewImage.delete({ where: { id: imageId } });
 
       await tx.reviewModerationAudit.create({
