@@ -1,4 +1,4 @@
-import type { Review, RatingSummary, ReviewEligibility, CustomerPhotoItem, User } from "../types";
+import type { Review, RatingSummary, ReviewEligibility, CustomerPhotoItem, User, MyReviewItem, EligibleReviewItem } from "../types";
 import { api } from "../api";
 
 const REVIEWS_STORAGE_KEY = "shadow_real_reviews_v1";
@@ -337,6 +337,26 @@ export async function fetchReviewEligibility(slug: string, user: User | null): P
   };
 }
 
+export async function fetchMyReviews(): Promise<MyReviewItem[]> {
+  try {
+    const res = await api<MyReviewItem[]>("/reviews/my-reviews");
+    if (Array.isArray(res)) return res;
+  } catch (err) {
+    console.warn("Failed to fetch my reviews from API:", err);
+  }
+  return [];
+}
+
+export async function fetchMyEligibleItems(): Promise<EligibleReviewItem[]> {
+  try {
+    const res = await api<EligibleReviewItem[]>("/reviews/my-eligible-items");
+    if (Array.isArray(res)) return res;
+  } catch (err) {
+    console.warn("Failed to fetch my eligible review items from API:", err);
+  }
+  return [];
+}
+
 /**
  * Create or Edit Review in real time
  */
@@ -344,6 +364,7 @@ export async function submitRealReview(
   slug: string,
   productId: string,
   data: {
+    reviewId?: string;
     rating: number;
     title?: string;
     comment?: string;
@@ -354,22 +375,37 @@ export async function submitRealReview(
   },
   user: User
 ): Promise<Review> {
-  // 1. Send to backend if connected
-  try {
-    await api(`/products/${slug}/reviews`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  } catch (e: any) {
-    if (
-      e?.status === 403 ||
-      e?.code === "DELIVERY_REQUIRED" ||
-      e?.message?.includes("verified buyers") ||
-      e?.message?.includes("received this product")
-    ) {
-      throw new Error(e.message || "Only verified buyers who have received this product can submit a review.");
+  // 1. Send to backend
+  if (data.reviewId) {
+    try {
+      await api(`/reviews/${data.reviewId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    } catch (e: any) {
+      console.warn("Backend review update failed:", e);
+      if (e?.message) throw new Error(e.message);
     }
-    console.warn("Backend review endpoint unreachable; recording to real persistent store", e);
+  } else {
+    try {
+      await api(`/products/${slug || productId}/reviews`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    } catch (e: any) {
+      if (
+        e?.status === 403 ||
+        e?.code === "DELIVERY_REQUIRED" ||
+        e?.message?.includes("verified buyers") ||
+        e?.message?.includes("received this product")
+      ) {
+        throw new Error(e.message || "Only verified buyers who have received this product can submit a review.");
+      }
+      if (e?.status === 409 || e?.code === "DUPLICATE_REVIEW") {
+        throw new Error("You have already reviewed this product. You can view or edit your review from My Reviews.");
+      }
+      console.warn("Backend review endpoint unreachable; recording to real persistent store", e);
+    }
   }
 
   // 2. Save into persistent store

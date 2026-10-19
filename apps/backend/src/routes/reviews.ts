@@ -608,3 +608,137 @@ reviewsRouter.delete(
     return success(res, "Vote removed.", result);
   })
 );
+
+// ─── 10. Authenticated: Customer My Reviews ────────────────────────────────
+reviewsRouter.get(
+  "/reviews/my-reviews",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const customerId = req.auth!.id;
+    const reviews = await prisma.productReview.findMany({
+      where: { customerId },
+      include: {
+        product: { select: { id: true, name: true, slug: true, thumbnail: true, price: true, salePrice: true } },
+        images: { orderBy: { sortOrder: "asc" } },
+        replies: { select: { id: true, replyText: true, createdAt: true } },
+        order: { select: { id: true, orderNumber: true, deliveredAt: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const items = reviews.map((r: any) => ({
+      id: r.id,
+      productId: r.productId,
+      productName: r.product?.name || "Product",
+      productSlug: r.product?.slug || "",
+      productThumbnail: r.product?.thumbnail || "",
+      productPrice: r.product?.salePrice || r.product?.price || 0,
+      rating: r.rating,
+      title: r.title || "",
+      comment: r.comment || "",
+      status: r.status,
+      isVerified: r.isVerified,
+      purchasedSize: r.purchasedSize,
+      purchasedColor: r.purchasedColor,
+      fit: r.fit,
+      fabricQuality: r.fabricQuality,
+      comfort: r.comfort,
+      helpfulCount: r.helpfulCount,
+      notHelpfulCount: r.notHelpfulCount,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      images: r.images.map((img: any) => ({ id: img.id, url: img.url })),
+      replies: r.replies.map((rep: any) => ({ id: rep.id, text: rep.replyText, createdAt: rep.createdAt })),
+      orderNumber: r.order?.orderNumber || null,
+      deliveredAt: r.order?.deliveredAt || null,
+    }));
+
+    return success(res, "My reviews loaded.", items);
+  })
+);
+
+// ─── 11. Authenticated: Customer Eligible Delivered Items for Review ────────
+reviewsRouter.get(
+  "/reviews/my-eligible-items",
+  requireAuth,
+  asyncHandler(async (req: Request, res: Response) => {
+    const customerId = req.auth!.id;
+
+    // Find all delivered orders belonging to this customer
+    const deliveredOrders = await prisma.order.findMany({
+      where: {
+        customerId,
+        OR: [
+          { orderStatus: "DELIVERED" },
+          { deliveredAt: { not: null } },
+          { items: { some: { itemStatus: "DELIVERED" } } },
+        ],
+      },
+      include: {
+        items: {
+          include: {
+            product: { select: { id: true, name: true, slug: true, thumbnail: true, price: true, salePrice: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Also get all existing reviews by this customer to map them
+    const existingReviews = await prisma.productReview.findMany({
+      where: { customerId },
+      include: {
+        images: true,
+      },
+    });
+    const reviewByProductId = new Map(existingReviews.map((r: any) => [r.productId, r]));
+
+    // Map unique products from delivered orders
+    const seenProductIds = new Set<string>();
+    const eligibleItems: any[] = [];
+
+    for (const order of deliveredOrders) {
+      for (const item of order.items) {
+        const isItemDelivered =
+          order.orderStatus === "DELIVERED" ||
+          Boolean(order.deliveredAt) ||
+          item.itemStatus === "DELIVERED" ||
+          Boolean(item.deliveredAt);
+        if (!isItemDelivered) continue;
+
+        if (!seenProductIds.has(item.productId)) {
+          seenProductIds.add(item.productId);
+          const existingRev = reviewByProductId.get(item.productId);
+
+          eligibleItems.push({
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            orderItemId: item.id,
+            deliveredAt: item.deliveredAt || order.deliveredAt || order.updatedAt,
+            productId: item.productId,
+            productName: item.product?.name || item.productNameSnapshot,
+            productSlug: item.product?.slug || "",
+            productThumbnail: item.product?.thumbnail || item.productImageSnapshot || "",
+            productPrice: item.unitPriceSnapshot,
+            selectedSize: item.selectedSize,
+            selectedColor: item.selectedColor,
+            hasReview: Boolean(existingRev),
+            review: existingRev
+              ? {
+                  id: existingRev.id,
+                  rating: existingRev.rating,
+                  title: existingRev.title || "",
+                  comment: existingRev.comment || "",
+                  status: existingRev.status,
+                  createdAt: existingRev.createdAt,
+                  images: existingRev.images.map((i: any) => ({ id: i.id, url: i.url })),
+                }
+              : null,
+          });
+        }
+      }
+    }
+
+    return success(res, "Eligible review items loaded.", eligibleItems);
+  })
+);

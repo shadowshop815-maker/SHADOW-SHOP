@@ -1,14 +1,12 @@
-import { CheckCircle2, Star, Edit3, Plus } from "lucide-react";
-import type { RatingSummary as RatingSummaryType, ReviewEligibility } from "../../types";
+import { CheckCircle2, Star, ShieldCheck } from "lucide-react";
+import type { RatingSummary as RatingSummaryType } from "../../types";
 import { RatingBadge } from "./RatingStars";
 
 interface RatingSummaryProps {
   summary: RatingSummaryType;
-  eligibility?: ReviewEligibility | null;
-  onOpenReviewModal: () => void;
 }
 
-export function RatingSummary({ summary, eligibility, onOpenReviewModal }: RatingSummaryProps) {
+export function RatingSummary({ summary }: RatingSummaryProps) {
   const { averageRating, totalRatings, verifiedBuyerRatings, ratingLabel, stars, starPercentages, attributes } = summary;
 
   // Star bar colors (Flipkart standard)
@@ -42,35 +40,23 @@ export function RatingSummary({ summary, eligibility, onOpenReviewModal }: Ratin
             <span>{verifiedBuyerRatings.toLocaleString("en-IN")} Verified Buyer Ratings</span>
           </div>
 
-          {/* Action button: Rate Product or Edit Your Review */}
-          <div style={{ marginTop: "18px" }}>
-            <button
-              type="button"
-              onClick={onOpenReviewModal}
-              className="rate-product-btn"
-            >
-              {eligibility?.hasExistingReview ? (
-                <>
-                  <Edit3 size={15} />
-                  <span>Edit Your Review</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={15} />
-                  <span>Rate Product</span>
-                </>
-              )}
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", fontSize: "11.5px", color: eligibility?.canReview ? "#059669" : "var(--muted)" }}>
-              {eligibility?.canReview ? (
-                <>
-                  <CheckCircle2 size={13} color="#059669" />
-                  <span style={{ fontWeight: 600 }}>Verified Purchase · Delivered</span>
-                </>
-              ) : (
-                <span>🛡️ Ratings unlock automatically after delivery</span>
-              )}
-            </div>
+          {/* Flipkart / Amazon style: Verified Purchase Notice (Read Only) */}
+          <div
+            style={{
+              marginTop: "16px",
+              padding: "10px 14px",
+              borderRadius: "10px",
+              background: "var(--layer-2)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <ShieldCheck size={16} color="var(--gold)" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: "12px", color: "var(--muted)", lineHeight: 1.4 }}>
+              <strong>100% Verified Buyer Reviews:</strong> Reviews can only be submitted by verified customers after delivery from their <em>Account → My Orders</em>.
+            </span>
           </div>
         </div>
 

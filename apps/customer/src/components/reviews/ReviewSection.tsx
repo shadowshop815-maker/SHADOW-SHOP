@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, MessageSquarePlus, ShieldCheck, PackageCheck } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "../../features/auth/AuthContext";
-import type { RatingSummary as RatingSummaryType, Review, ReviewEligibility, CustomerPhotoItem } from "../../types";
+import type { RatingSummary as RatingSummaryType, Review, CustomerPhotoItem } from "../../types";
 import { RatingSummary } from "./RatingSummary";
 import { ReviewPhotoGallery } from "./ReviewPhotoGallery";
 import { ReviewCard } from "./ReviewCard";
-import { ReviewFormModal } from "./ReviewFormModal";
 import {
   fetchRatingSummary,
   fetchReviews,
   fetchCustomerPhotos,
-  fetchReviewEligibility,
 } from "../../services/reviewStore";
 
 interface ReviewSectionProps {
@@ -26,8 +23,6 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isEligibilityNoticeOpen, setIsEligibilityNoticeOpen] = useState(false);
 
   // Filter and Sort states
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
@@ -49,14 +44,7 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
     queryFn: () => fetchCustomerPhotos(slug),
   });
 
-  // 3. Fetch Real Review Eligibility
-  const { data: eligibility } = useQuery<ReviewEligibility>({
-    queryKey: ["review-eligibility", slug, auth.user?.id],
-    queryFn: () => fetchReviewEligibility(slug, auth.user),
-    enabled: Boolean(auth.user),
-  });
-
-  // 4. Fetch Real Paginated Reviews
+  // 3. Fetch Real Paginated Reviews
   const { data: reviewsData, isLoading: reviewsLoading } = useQuery<{
     items: Review[];
     pagination: { page: number; limit: number; total: number; pages: number };
@@ -83,7 +71,6 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
         queryClient.invalidateQueries({ queryKey: ["product-rating-summary", slug] });
         queryClient.invalidateQueries({ queryKey: ["product-reviews", slug] });
         queryClient.invalidateQueries({ queryKey: ["product-review-photos", slug] });
-        queryClient.invalidateQueries({ queryKey: ["review-eligibility", slug] });
         queryClient.invalidateQueries({ queryKey: ["product", slug] });
       }
     };
@@ -91,26 +78,6 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
     window.addEventListener("shadow_reviews_updated", handleUpdate);
     return () => window.removeEventListener("shadow_reviews_updated", handleUpdate);
   }, [slug, queryClient]);
-
-  const handleReviewSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["product-rating-summary", slug] });
-    queryClient.invalidateQueries({ queryKey: ["product-reviews", slug] });
-    queryClient.invalidateQueries({ queryKey: ["product-review-photos", slug] });
-    queryClient.invalidateQueries({ queryKey: ["review-eligibility", slug] });
-    queryClient.invalidateQueries({ queryKey: ["product", slug] });
-  };
-
-  const handleOpenReviewModal = () => {
-    if (!auth.user) {
-      setIsEligibilityNoticeOpen(true);
-      return;
-    }
-    if (!eligibility?.canReview) {
-      setIsEligibilityNoticeOpen(true);
-      return;
-    }
-    setIsModalOpen(true);
-  };
 
   return (
     <section className="review-section-container" id="customer-reviews">
@@ -145,11 +112,7 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
               <div className="loader"><span /></div>
             </div>
           ) : summary ? (
-            <RatingSummary
-              summary={summary}
-              eligibility={eligibility}
-              onOpenReviewModal={handleOpenReviewModal}
-            />
+            <RatingSummary summary={summary} />
           ) : null}
 
           {/* Flipkart Photo Grid & Lightbox (renders only when real customer photos exist) */}
@@ -253,7 +216,6 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
                 <ReviewCard
                   key={review.id}
                   review={review}
-                  onEdit={handleOpenReviewModal}
                 />
               ))}
 
@@ -283,119 +245,19 @@ export function ReviewSection({ slug, productId, productName, productThumbnail }
               )}
             </div>
           ) : (
-            /* Authentic Real Empty State */
+            /* Authentic Real Empty State (Strictly Read-Only) */
             <div className="reviews-empty-state">
-              <div className="empty-icon-circle">
-                <MessageSquarePlus size={28} color="var(--gold)" />
-              </div>
               <h4 style={{ margin: "14px 0 6px", fontSize: "16px", color: "var(--text)" }}>
                 No reviews yet
               </h4>
-              <p style={{ margin: 0, fontSize: "13.5px", color: "var(--muted)", maxWidth: "360px", lineHeight: 1.6 }}>
-                Be the first verified customer to share feedback and photos after receiving delivery!
+              <p style={{ margin: 0, fontSize: "13.5px", color: "var(--muted)", maxWidth: "380px", lineHeight: 1.6 }}>
+                There are no published reviews for this product yet. Verified buyers can submit reviews after delivery from their Account → My Orders.
               </p>
-              <button
-                type="button"
-                onClick={handleOpenReviewModal}
-                className="button"
-                style={{ marginTop: "18px" }}
-              >
-                {eligibility?.hasExistingReview ? "Edit Your Review" : "Write a Review"}
-              </button>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "12px", color: "var(--muted)", fontSize: "12px" }}>
-                <ShieldCheck size={14} color="var(--gold)" />
-                <span>Reviews are restricted to customers who purchased and received this product</span>
-              </div>
             </div>
           )}
         </div>
       )}
-
-      {/* Eligibility Notice Modal (Flipkart / Amazon authentic standard) */}
-      {isEligibilityNoticeOpen && (
-        <div className="review-modal-backdrop" onClick={() => setIsEligibilityNoticeOpen(false)}>
-          <div
-            className="review-modal-card"
-            style={{ maxWidth: "460px", padding: "32px 28px", textAlign: "center" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              style={{
-                width: 60,
-                height: 60,
-                borderRadius: "50%",
-                background: !auth.user ? "rgba(217, 119, 6, 0.12)" : "rgba(16, 185, 129, 0.12)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 18px",
-              }}
-            >
-              {!auth.user ? (
-                <ShieldCheck size={32} color="var(--gold)" />
-              ) : (
-                <PackageCheck size={32} color="#059669" />
-              )}
-            </div>
-
-            <h3 style={{ fontSize: "19px", color: "var(--text)", margin: "0 0 10px 0", fontWeight: 800 }}>
-              {!auth.user ? "Sign In to Rate & Review" : "Delivery Required to Review"}
-            </h3>
-
-            <p style={{ fontSize: "14px", color: "var(--muted)", lineHeight: 1.6, margin: "0 0 24px" }}>
-              {!auth.user
-                ? "To ensure all ratings and reviews are 100% genuine, only verified buyers who have received delivery of this product can submit a review. Please sign in with your buyer account."
-                : "Reviews unlock automatically once your order has been confirmed as Delivered by our courier partner. If your order is on the way, you can check its live status in your Orders page."}
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {!auth.user ? (
-                <Link
-                  to={`/login?redirect=/products/${slug}#customer-reviews`}
-                  className="button"
-                  style={{ width: "100%", justifyContent: "center" }}
-                >
-                  Sign In with Buyer Account
-                </Link>
-              ) : (
-                <Link
-                  to="/account"
-                  className="button"
-                  style={{ width: "100%", justifyContent: "center" }}
-                >
-                  View My Orders
-                </Link>
-              )}
-              <button
-                type="button"
-                className="button ghost"
-                onClick={() => setIsEligibilityNoticeOpen(false)}
-                style={{ width: "100%", justifyContent: "center" }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Review Modal Form (Only opened for eligible delivered buyers) */}
-      <ReviewFormModal
-        slug={slug}
-        productName={productName}
-        productThumbnail={productThumbnail}
-        eligibility={
-          eligibility || {
-            canReview: false,
-            isDeliveredBuyer: false,
-            hasExistingReview: false,
-            existingReview: null,
-          }
-        }
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSuccess={handleReviewSuccess}
-      />
     </section>
   );
 }
+

@@ -50,7 +50,14 @@ export function Checkout() {
   useEffect(() => {
     const chosen = addresses?.find(a => a.isDefault) || addresses?.[0];
     if (chosen) setAddressId(chosen.id || "");
-  }, [addresses]); 
+    if (auth.user && (!address.fullName || !address.phone)) {
+      setAddress(prev => ({
+        ...prev,
+        fullName: prev.fullName || auth.user?.name || "",
+        phone: prev.phone || auth.user?.phone || "",
+      }));
+    }
+  }, [addresses, auth.user]); 
   
   // Cart operation mutations
   const cartMutation = useMutation({

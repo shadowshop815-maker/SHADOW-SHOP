@@ -69,14 +69,14 @@ async function cartView(req: any, cart: NonNullable<Awaited<ReturnType<typeof ge
   let offerDiscount = 0;
   let offerApplied = null;
   
-  if (cart.appliedOfferCode) {
-    let resolvedAddressId = cart.deliveryAddressId || undefined;
-    if (!resolvedAddressId && req.auth?.id) {
-      let defaultAddr = await prisma.address.findFirst({ where: { userId: req.auth.id, isDefault: true } });
-      if (!defaultAddr) defaultAddr = await prisma.address.findFirst({ where: { userId: req.auth.id } });
-      if (defaultAddr) resolvedAddressId = defaultAddr.id;
-    }
+  let resolvedAddressId = cart.deliveryAddressId || undefined;
+  if (!resolvedAddressId && req.auth?.id) {
+    let defaultAddr = await prisma.address.findFirst({ where: { userId: req.auth.id, isDefault: true } });
+    if (!defaultAddr) defaultAddr = await prisma.address.findFirst({ where: { userId: req.auth.id } });
+    if (defaultAddr) resolvedAddressId = defaultAddr.id;
+  }
 
+  if (cart.appliedOfferCode) {
     const context: CartContext = {
       userId: cart.userId || undefined,
       addressId: resolvedAddressId,
@@ -101,7 +101,7 @@ async function cartView(req: any, cart: NonNullable<Awaited<ReturnType<typeof ge
   const shippingCtx = {
     subtotalBeforeDiscount: subtotal,
     subtotalAfterDiscount: finalMerchandiseSubtotal,
-    addressId: cart.deliveryAddressId || undefined
+    addressId: resolvedAddressId || undefined
   };
 
   // Fetch delivery options and base shipping info in one parallel batch
@@ -321,7 +321,26 @@ commerceRouter.post("/checkout", optionalAuth, asyncHandler(async (req, res) => 
   let resolvedLat: number | undefined;
   let resolvedLng: number | undefined;
   if (input.addressId) { if (!req.auth) throw new AppError(400, "Sign in to use a saved address.", "AUTH_REQUIRED"); const saved = await prisma.address.findFirst({ where: { id: input.addressId, userId: req.auth.id } }); if (!saved) throw new AppError(404, "Delivery address not found.", "NOT_FOUND"); addressId = saved.id; address = saved as unknown as Record<string, unknown>; if (saved.latitude != null) resolvedLat = saved.latitude; if (saved.longitude != null) resolvedLng = saved.longitude; }
-  else { address = input.shippingAddress!; resolvedLat = (input.shippingAddress as any)?.latitude ?? undefined; resolvedLng = (input.shippingAddress as any)?.longitude ?? undefined; }
+  else {
+    address = input.shippingAddress!;
+    resolvedLat = (input.shippingAddress as any)?.latitude ?? undefined;
+    resolvedLng = (input.shippingAddress as any)?.longitude ?? undefined;
+    if (req.auth?.id && input.shippingAddress) {
+      try {
+        const addrCount = await prisma.address.count({ where: { userId: req.auth.id } });
+        const createdAddr = await prisma.address.create({
+          data: {
+            ...input.shippingAddress,
+            userId: req.auth.id,
+            isDefault: addrCount === 0 || Boolean(input.shippingAddress.isDefault),
+          },
+        });
+        addressId = createdAddr.id;
+      } catch (err) {
+        console.warn("[Commerce] Could not auto-save address to user:", err);
+      }
+    }
+  }
   const afterBaseDiscount = subtotal;
 
   // ----- SHIPPING via Central ShippingPricingService -----

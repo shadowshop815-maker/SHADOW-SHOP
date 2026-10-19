@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, MapPin, Printer, ArrowLeft, Calendar, Clock, Truck, ShieldCheck, Package, AlertCircle, Star } from "lucide-react";
+import { Check, MapPin, Printer, ArrowLeft, Calendar, Clock, Truck, ShieldCheck, Package, AlertCircle, Star, Edit3 } from "lucide-react";
 import { api, money, resolveImageUrl } from "../../api";
 import type { Order } from "../../types";
 import { Spinner, Status } from "../../components/ui";
 import { Invoice } from "../../components/ui/Invoice";
 import { ReturnItemButton } from "../../components/returns/ReturnItemButton";
+import { fetchMyReviews } from "../../services/reviewStore";
+import { ReviewFormModal } from "../../components/reviews/ReviewFormModal";
 
 const orderSteps = ["PENDING", "CONFIRMED", "PROCESSING", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY", "DELIVERED"];
 
@@ -18,6 +20,20 @@ export function OrderDetail() {
     queryKey: ["order", id],
     queryFn: () => api<Order>(`/orders/${id}`)
   }); 
+
+  const { data: myReviews, refetch: refetchReviews } = useQuery({
+    queryKey: ["my-reviews"],
+    queryFn: fetchMyReviews,
+  });
+
+  const [reviewModalItem, setReviewModalItem] = useState<{
+    productId: string;
+    productName: string;
+    productThumbnail?: string;
+    purchasedSize?: string;
+    purchasedColor?: string;
+    existingReview?: any;
+  } | null>(null);
   
   const [reason, setReason] = useState(""); 
   
@@ -241,27 +257,83 @@ export function OrderDetail() {
                     </div>
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "6px" }}>
                       <ReturnItemButton order={order} item={i} />
-                      {order.orderStatus === "DELIVERED" && (
-                        <Link
-                          to={`/products/${i.productId}#customer-reviews`}
-                          className="outline-button"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "5px",
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            borderRadius: "6px",
-                            color: "var(--gold)",
-                            borderColor: "var(--gold)",
-                            fontWeight: 700,
-                            textDecoration: "none",
-                          }}
-                        >
-                          <Star size={13} fill="currentColor" />
-                          <span>Rate &amp; Review</span>
-                        </Link>
-                      )}
+                      {(() => {
+                        const isItemDelivered =
+                          order.orderStatus === "DELIVERED" ||
+                          (i as any).itemStatus === "DELIVERED" ||
+                          Boolean((i as any).deliveredAt) ||
+                          Boolean(order.deliveredAt);
+                        if (!isItemDelivered) return null;
+
+                        const existingRev = myReviews?.find((r) => r.productId === i.productId);
+                        if (existingRev) {
+                          return (
+                            <button
+                              type="button"
+                              className="outline-button"
+                              onClick={() =>
+                                setReviewModalItem({
+                                  productId: i.productId,
+                                  productName: i.productNameSnapshot,
+                                  productThumbnail: i.productImageSnapshot,
+                                  purchasedSize: i.selectedSize,
+                                  purchasedColor: i.selectedColor,
+                                  existingReview: existingRev,
+                                })
+                              }
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "6px 14px",
+                                fontSize: "12px",
+                                borderRadius: "6px",
+                                color: "var(--gold)",
+                                borderColor: "var(--gold)",
+                                fontWeight: 700,
+                                background: "rgba(212, 175, 55, 0.08)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <Edit3 size={13} />
+                              <span>View / Edit My Review</span>
+                            </button>
+                          );
+                        }
+
+                        return (
+                          <button
+                            type="button"
+                            className="outline-button"
+                            onClick={() =>
+                              setReviewModalItem({
+                                productId: i.productId,
+                                productName: i.productNameSnapshot,
+                                productThumbnail: i.productImageSnapshot,
+                                purchasedSize: i.selectedSize,
+                                purchasedColor: i.selectedColor,
+                                existingReview: undefined,
+                              })
+                            }
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "6px 14px",
+                              fontSize: "12px",
+                              borderRadius: "6px",
+                              color: "var(--gold)",
+                              borderColor: "var(--gold)",
+                              fontWeight: 700,
+                              background: "rgba(212, 175, 55, 0.08)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <Star size={13} fill="currentColor" />
+                            <span>Write a Review</span>
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -696,6 +768,33 @@ export function OrderDetail() {
             }
           `}</style>
         </div>
+      )}
+
+      {/* Customer Review Submission & Edit Modal */}
+      {reviewModalItem && (
+        <ReviewFormModal
+          slug={reviewModalItem.productId}
+          productId={reviewModalItem.productId}
+          productName={reviewModalItem.productName}
+          productThumbnail={reviewModalItem.productThumbnail}
+          eligibility={{
+            isEligible: true,
+            hasPurchased: true,
+            isDelivered: true,
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            purchasedSize: reviewModalItem.purchasedSize,
+            purchasedColor: reviewModalItem.purchasedColor,
+            existingReview: reviewModalItem.existingReview,
+          }}
+          isOpen={Boolean(reviewModalItem)}
+          onClose={() => setReviewModalItem(null)}
+          onSuccess={() => {
+            refetchReviews();
+            client.invalidateQueries({ queryKey: ["my-reviews"] });
+            client.invalidateQueries({ queryKey: ["my-eligible-items"] });
+          }}
+        />
       )}
 
       {/* Printable Invoice Component */}

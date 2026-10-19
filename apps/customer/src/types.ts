@@ -57,10 +57,14 @@ export interface RatingSummary {
 }
 
 export interface ReviewEligibility {
-  canReview: boolean;
-  isDeliveredBuyer: boolean;
-  hasExistingReview: boolean;
-  existingReview: {
+  canReview?: boolean;
+  isDeliveredBuyer?: boolean;
+  hasExistingReview?: boolean;
+  isEligible?: boolean;
+  hasPurchased?: boolean;
+  isDelivered?: boolean;
+  orderNumber?: string | null;
+  existingReview?: {
     id: string;
     rating: number;
     title?: string;
@@ -90,6 +94,57 @@ export interface CustomerPhotoItem {
   author: string;
   customerName?: string;
   createdAt: string;
+}
+
+export interface MyReviewItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  productThumbnail: string;
+  productPrice: number | string;
+  rating: number;
+  title: string;
+  comment: string;
+  status: string;
+  isVerified: boolean;
+  purchasedSize?: string | null;
+  purchasedColor?: string | null;
+  fit?: string | null;
+  fabricQuality?: string | null;
+  comfort?: string | null;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  createdAt: string;
+  updatedAt?: string;
+  images: { id: string; url: string }[];
+  replies?: { id: string; text: string; createdAt: string }[];
+  orderNumber?: string | null;
+  deliveredAt?: string | null;
+}
+
+export interface EligibleReviewItem {
+  orderId: string;
+  orderNumber: string;
+  orderItemId: string;
+  deliveredAt: string;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  productThumbnail: string;
+  productPrice: number | string;
+  selectedSize?: string;
+  selectedColor?: string;
+  hasReview: boolean;
+  review?: {
+    id: string;
+    rating: number;
+    title: string;
+    comment: string;
+    status: string;
+    createdAt: string;
+    images: { id: string; url: string }[];
+  } | null;
 }
 export interface CartItem { id: string; quantity: number; selectedSize: string; selectedColor: string; unitPrice: number; lineTotal: number; product: Product }
 export interface Cart { id: string; items: CartItem[]; appliedOfferCode?: string | null; appliedOffer?: any; totals: { subtotal: number; discount: number; offerDiscount: number; shipping: number; tax: number; grandTotal: number }; shipping?: { baseShippingFee?: number; freeShippingThreshold?: number; freeShippingEligible?: boolean; effectiveBaseShipping?: number; shippingStatus?: "NOT_SELECTED" | "CONFIRMED"; selectedOptionBreakdown?: any; [key: string]: any }; currency: string; deliveryOptionId?: string | null; deliveryOptions?: any[]; deliveryAddressId?: string | null }

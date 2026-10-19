@@ -8,6 +8,7 @@ import { RatingStarSelector } from "./RatingStars";
 
 interface ReviewFormModalProps {
   slug: string;
+  productId?: string;
   productName: string;
   productThumbnail?: string;
   eligibility: ReviewEligibility;
@@ -18,6 +19,7 @@ interface ReviewFormModalProps {
 
 export function ReviewFormModal({
   slug,
+  productId,
   productName,
   productThumbnail,
   eligibility,
@@ -154,8 +156,9 @@ export function ReviewFormModal({
       // 2. Submit or update review via real persistent review service
       await submitRealReview(
         slug,
-        eligibility.orderItemId || slug,
+        productId || slug,
         {
+          reviewId: existing?.id,
           rating,
           title: title.trim(),
           comment: comment.trim(),
