@@ -301,7 +301,11 @@ export function Reviews() {
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                           <span style={{ fontWeight: 600 }}>{r.customer.name}</span>
-                          {r.isVerified && <CheckCircle2 size={13} color="#059669" title="Verified Buyer" />}
+                          {r.isVerified && (
+                            <span title="Verified Buyer" style={{ display: "inline-flex", alignItems: "center" }}>
+                              <CheckCircle2 size={13} color="#059669" />
+                            </span>
+                          )}
                         </div>
                         <small style={{ color: "var(--muted)", display: "block" }}>{r.customer.email}</small>
                       </div>

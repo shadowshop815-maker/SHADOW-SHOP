@@ -171,7 +171,7 @@ export function ProductCard({ product, priority = false }: { product: Product; p
 
         {Number(product.averageRating) > 0 && (
           <div style={{ position: "absolute", bottom: 14, left: 14, zIndex: 9 }}>
-            <RatingBadge rating={product.averageRating} size="sm" />
+            <RatingBadge rating={product.averageRating ?? 0} size="sm" />
           </div>
         )}
 

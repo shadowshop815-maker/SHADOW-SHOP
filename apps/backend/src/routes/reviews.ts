@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "../config/db.js";
 import { env, uploadDirectory } from "../config/env.js";
@@ -34,10 +35,11 @@ function formatCustomerDisplayName(fullName?: string | null): string {
   if (!fullName || typeof fullName !== "string") return "Verified Customer";
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "Verified Customer";
-  if (parts.length === 1) return parts[0];
-  const first = parts[0];
-  const lastInitial = parts[parts.length - 1][0].toUpperCase() + ".";
-  return `${first} ${lastInitial}`;
+  const first = parts[0] || "Customer";
+  if (parts.length === 1) return first;
+  const last = parts[parts.length - 1] || "";
+  const lastInitial = last && last[0] ? last[0].toUpperCase() + "." : "";
+  return `${first} ${lastInitial}`.trim();
 }
 
 /**
@@ -56,7 +58,8 @@ async function resolveProductId(slugOrId: string): Promise<string> {
 reviewsRouter.get(
   "/products/:slug/rating-summary",
   asyncHandler(async (req: Request, res: Response) => {
-    const productId = await resolveProductId(req.params.slug);
+    const slug = String(req.params.slug || "");
+    const productId = await resolveProductId(slug);
     const summary = await getProductRatingSummary(productId);
     res.setHeader("Cache-Control", "public, max-age=60, s-maxage=120, stale-while-revalidate=86400");
     return success(res, "Rating summary loaded.", summary);
@@ -67,7 +70,8 @@ reviewsRouter.get(
 reviewsRouter.get(
   "/products/:slug/review-photos",
   asyncHandler(async (req: Request, res: Response) => {
-    const productId = await resolveProductId(req.params.slug);
+    const slug = String(req.params.slug || "");
+    const productId = await resolveProductId(slug);
     const images = await prisma.$queryRaw<
       Array<{
         id: string;
@@ -97,7 +101,7 @@ reviewsRouter.get(
       LIMIT 100
     `;
 
-    const mapped = images.map((img) => ({
+    const mapped = (images as any[]).map((img: any) => ({
       id: img.id,
       url: img.url,
       reviewId: img.reviewId,
@@ -118,7 +122,8 @@ reviewsRouter.get(
   "/products/:slug/reviews",
   optionalAuth,
   asyncHandler(async (req: Request, res: Response) => {
-    const productId = await resolveProductId(req.params.slug);
+    const slug = String(req.params.slug || "");
+    const productId = await resolveProductId(slug);
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 10));
     const offset = (page - 1) * limit;
@@ -170,7 +175,7 @@ reviewsRouter.get(
     // If user is authenticated, determine their votes on these reviews
     let userVotesMap: Record<string, "HELPFUL" | "NOT_HELPFUL"> = {};
     if (req.auth?.id) {
-      const reviewIds = reviews.map((r) => r.id);
+      const reviewIds = reviews.map((r: any) => r.id);
       if (reviewIds.length > 0) {
         const votes = await prisma.reviewVote.findMany({
           where: { reviewId: { in: reviewIds }, customerId: req.auth.id },
@@ -182,7 +187,7 @@ reviewsRouter.get(
       }
     }
 
-    const items = reviews.map((r) => ({
+    const items = reviews.map((r: any) => ({
       id: r.id,
       rating: r.rating,
       title: r.title || "",
@@ -199,8 +204,8 @@ reviewsRouter.get(
       author: formatCustomerDisplayName(r.customer?.name),
       isOwnReview: req.auth?.id ? r.customerId === req.auth.id : false,
       userVote: userVotesMap[r.id] || null,
-      images: r.images.map((img) => ({ id: img.id, url: img.url })),
-      replies: r.replies.map((rep) => ({
+      images: r.images.map((img: any) => ({ id: img.id, url: img.url })),
+      replies: r.replies.map((rep: any) => ({
         id: rep.id,
         text: rep.replyText,
         createdAt: rep.createdAt,
@@ -225,7 +230,8 @@ reviewsRouter.get(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const customerId = req.auth!.id;
-    const productId = await resolveProductId(req.params.slug);
+    const slug = String(req.params.slug || "");
+    const productId = await resolveProductId(slug);
 
     // Check if customer already reviewed this product
     const existingReview = await prisma.productReview.findUnique({
@@ -270,7 +276,7 @@ reviewsRouter.get(
             comfort: existingReview.comfort,
             purchasedSize: existingReview.purchasedSize,
             purchasedColor: existingReview.purchasedColor,
-            images: existingReview.images.map((i) => ({ id: i.id, url: i.url })),
+            images: existingReview.images.map((i: any) => ({ id: i.id, url: i.url })),
             status: existingReview.status,
             createdAt: existingReview.createdAt,
           }
@@ -326,7 +332,8 @@ reviewsRouter.post(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const customerId = req.auth!.id;
-    const productId = await resolveProductId(req.params.slug);
+    const slug = String(req.params.slug || "");
+    const productId = await resolveProductId(slug);
 
     // Verify customer has a delivered order for this product
     const deliveredOrder = await prisma.order.findFirst({
@@ -393,7 +400,7 @@ reviewsRouter.post(
     const orderItem = deliveredOrder.items[0];
 
     // Transactionally create review and update aggregates
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const review = await tx.productReview.create({
         data: {
           productId,
@@ -434,7 +441,7 @@ reviewsRouter.put(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const customerId = req.auth!.id;
-    const reviewId = req.params.id;
+    const reviewId = String(req.params.id || "");
 
     const existing = await prisma.productReview.findUnique({
       where: { id: reviewId },
@@ -464,7 +471,7 @@ reviewsRouter.put(
     const trimmedTitle = title !== undefined ? String(title).trim().slice(0, 150) : existing.title;
     const trimmedComment = comment !== undefined ? String(comment).trim().slice(0, 3000) : existing.comment;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // If images array is provided, replace images
       if (Array.isArray(images)) {
         await tx.reviewImage.deleteMany({ where: { reviewId } });
@@ -521,7 +528,7 @@ reviewsRouter.post(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const customerId = req.auth!.id;
-    const reviewId = req.params.id;
+    const reviewId = String(req.params.id || "");
     const voteType = String(req.body.voteType || "").toUpperCase();
 
     if (voteType !== "HELPFUL" && voteType !== "NOT_HELPFUL") {
@@ -542,7 +549,7 @@ reviewsRouter.post(
       throw new AppError(400, "You cannot vote on your own review.", "SELF_VOTE_NOT_ALLOWED");
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Upsert the customer's vote
       await tx.reviewVote.upsert({
         where: { reviewId_customerId: { reviewId, customerId } },
@@ -576,9 +583,9 @@ reviewsRouter.delete(
   requireAuth,
   asyncHandler(async (req: Request, res: Response) => {
     const customerId = req.auth!.id;
-    const reviewId = req.params.id;
+    const reviewId = String(req.params.id || "");
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.reviewVote.deleteMany({
         where: { reviewId, customerId },
       });

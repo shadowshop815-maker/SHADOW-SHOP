@@ -161,6 +161,7 @@ export function ReviewFormModal({
         auth.user || {
           id: "cust_" + Math.random().toString(36).substring(2, 9),
           email: "customer@shadowshop.example",
+          phone: null,
           role: "CUSTOMER",
           name: "Verified Buyer"
         }

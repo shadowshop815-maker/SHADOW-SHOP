@@ -110,7 +110,7 @@ adminReviewsRouter.patch(
   "/:id/status",
   asyncHandler(async (req: Request, res: Response) => {
     const adminId = req.auth!.id;
-    const reviewId = req.params.id;
+    const reviewId = String(req.params.id || "");
     const { status, reason = "" } = req.body;
 
     const validStatuses = ["PUBLISHED", "HIDDEN", "REJECTED", "PENDING"];
@@ -129,7 +129,7 @@ adminReviewsRouter.patch(
 
     const previousStatus = review.status;
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Update review status
       await tx.productReview.update({
         where: { id: reviewId },
@@ -165,7 +165,7 @@ adminReviewsRouter.post(
   "/:id/reply",
   asyncHandler(async (req: Request, res: Response) => {
     const adminId = req.auth!.id;
-    const reviewId = req.params.id;
+    const reviewId = String(req.params.id || "");
     const { text } = req.body;
 
     const replyText = typeof text === "string" ? text.trim() : "";
@@ -199,7 +199,8 @@ adminReviewsRouter.delete(
   "/:id/images/:imageId",
   asyncHandler(async (req: Request, res: Response) => {
     const adminId = req.auth!.id;
-    const { id: reviewId, imageId } = req.params;
+    const reviewId = String(req.params.id || "");
+    const imageId = String(req.params.imageId || "");
     const { reason = "Violates media policy" } = req.body || {};
 
     const image = await prisma.reviewImage.findFirst({
@@ -208,7 +209,7 @@ adminReviewsRouter.delete(
 
     if (!image) throw new AppError(404, "Review image not found.", "NOT_FOUND");
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.reviewImage.delete({ where: { id: imageId } });
 
       await tx.reviewModerationAudit.create({
