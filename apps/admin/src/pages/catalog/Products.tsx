@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Archive, Upload } from "lucide-react";
+import { Plus, Archive, Upload, Trash2, RotateCcw, Sparkles } from "lucide-react";
 import { api, money, resolveImageUrl } from "../../api";
 import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Toolbar, Loading, ErrorState, Empty, StatusBadge, Pager, Modal, Field, TextField, Pagination } from "../../components/ui";
@@ -60,7 +60,49 @@ function ProductEditor({ product, categories, onClose }: { product?: Product; ca
           <Field label="Product name" value={form.name} onChange={v => { set("name", v); if (!product) set("slug", v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")); }} required />
           <Field label="Slug" value={form.slug} onChange={v => set("slug", v)} required />
           <Field label="SKU" value={form.sku} onChange={v => set("sku", v)} required />
-          <Field label="Categories (comma separated)" value={form.categories} onChange={v => set("categories", v)} required />
+          <div className="field" style={{ gridColumn: "span 2" }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-secondary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6, display: "block" }}>Categories (Click to select)</label>
+            {categories.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                {categories.map(c => {
+                  const currentList = form.categories.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+                  const isSelected = currentList.includes(c.name.toLowerCase());
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        const items = form.categories.split(",").map(s => s.trim()).filter(Boolean);
+                        const exists = items.some(s => s.toLowerCase() === c.name.toLowerCase());
+                        const next = exists
+                          ? items.filter(s => s.toLowerCase() !== c.name.toLowerCase())
+                          : [...items, c.name];
+                        set("categories", next.join(", "));
+                      }}
+                      style={{
+                        padding: "4px 10px",
+                        fontSize: "12px",
+                        borderRadius: "14px",
+                        border: isSelected ? "1px solid var(--gold)" : "1px solid var(--border)",
+                        background: isSelected ? "rgba(212, 175, 55, 0.2)" : "var(--panel3)",
+                        color: isSelected ? "var(--gold)" : "var(--ink)",
+                        cursor: "pointer",
+                        fontWeight: isSelected ? 600 : 400
+                      }}
+                    >
+                      {isSelected ? "✓ " : "+ "}{c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <input 
+              value={form.categories} 
+              onChange={e => set("categories", e.target.value)} 
+              placeholder="Or type custom categories separated by commas" 
+              required 
+            />
+          </div>
           <Field label="Brand" value={form.brand} onChange={v => set("brand", v)} />
           <label>
             <span>Status</span>
@@ -209,6 +251,36 @@ export function Products() {
     }
   });
 
+  const restore = useMutation({
+    mutationFn: (id: string) => api(`/admin/products/${id}/restore`, { method: "POST" }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["admin-products"] });
+      client.invalidateQueries({ queryKey: ["admin-dashboard"] });
+    }
+  });
+
+  const deletePermanent = useMutation({
+    mutationFn: (id: string) => api(`/admin/products/${id}?permanent=true`, { method: "DELETE" }),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["admin-products"] });
+      client.invalidateQueries({ queryKey: ["admin-dashboard"] });
+    },
+    onError: (err: any) => alert(err.message || "Failed to delete product.")
+  });
+
+  const cleanDemo = useMutation({
+    mutationFn: () => api<{ count: number; deleted: string[] }>("/admin/catalog/clean-demo", { method: "POST" }),
+    onSuccess: (res) => {
+      client.invalidateQueries({ queryKey: ["admin-products"] });
+      client.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      alert(`Successfully cleaned ${res.count} demo product(s)!`);
+    },
+    onError: (err: any) => alert(err.message || "Failed to clean demo products.")
+  });
+
+  const demoSkus = ["SS-HD-001", "SS-JKT-001", "SS-SHIRT-004", "SS-SHIRT-003", "SS-TEE-002", "SS-TEE-001", "SS-SHIRT-002", "SS-SHIRT-001"];
+  const hasDemoProducts = data?.items?.some(p => demoSkus.includes(p.sku));
+
   return (
     <>
       <PageHead eyebrow="CATALOG" title="Products" description="Create and maintain the live customer catalog." action={<button className="primary" onClick={() => setEditor("new")}><Plus />New product</button>} />
@@ -221,6 +293,20 @@ export function Products() {
           <option>OUT_OF_STOCK</option>
           <option>ARCHIVED</option>
         </select>
+        {hasDemoProducts && (
+          <button 
+            type="button" 
+            className="ghost" 
+            style={{ color: "#ff6b6b", border: "1px solid rgba(255, 107, 107, 0.3)", display: "flex", alignItems: "center", gap: 6, fontWeight: 600, padding: "8px 14px", borderRadius: "8px" }}
+            onClick={async () => {
+              const ok = await confirm("Are you sure you want to permanently delete all demo products from the catalog? Only your real products will remain.", "Clean Demo Products");
+              if (ok) cleanDemo.mutate();
+            }}
+            disabled={cleanDemo.isPending}
+          >
+            <Sparkles size={16} /> {cleanDemo.isPending ? "Cleaning demo..." : "Clean Demo Products"}
+          </button>
+        )}
       </Toolbar>
       <section className="card">
         {isLoading ? <Loading /> : error ? <ErrorState error={error} /> : !data?.items.length ? <Empty /> : (
@@ -239,25 +325,61 @@ export function Products() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map(p => (
-                    <tr key={p.id}>
-                      <td>
-                        <div className="product-cell">
-                          <img src={resolveImageUrl(p.thumbnail || "/assets/product-fallback.svg")} alt="" />
-                          <b>{p.name}</b>
-                        </div>
-                      </td>
-                      <td>{p.sku}</td>
-                      <td>{p.categories.map(c => c.name).join(", ")}</td>
-                      <td>{money(p.salePrice || p.price)}{p.salePrice && <small><s>{money(p.price)}</s></small>}</td>
-                      <td className={p.stock <= p.lowStockThreshold ? "attention" : ""}>{p.stock}</td>
-                      <td><StatusBadge value={p.status} /></td>
-                      <td className="row-actions">
-                        <button onClick={() => setEditor(p)}>Edit</button>
-                        <button aria-label="Archive" onClick={async () => await confirm(`Archive ${p.name}? It will disappear from the customer catalog.`, "Archive product") && archive.mutate(p.id)}><Archive /></button>
-                      </td>
-                    </tr>
-                  ))}
+                  {data.items.map(p => {
+                    const isDemo = demoSkus.includes(p.sku);
+                    return (
+                      <tr key={p.id} style={isDemo ? { background: "rgba(255, 107, 107, 0.03)" } : undefined}>
+                        <td>
+                          <div className="product-cell">
+                            <img src={resolveImageUrl(p.thumbnail || "/assets/product-fallback.svg")} alt="" />
+                            <div>
+                              <b>{p.name}</b>
+                              {isDemo && <span style={{ marginLeft: 6, fontSize: "10px", padding: "2px 6px", borderRadius: 4, background: "rgba(255,107,107,0.15)", color: "#ff6b6b", fontWeight: 700 }}>DEMO</span>}
+                            </div>
+                          </div>
+                        </td>
+                        <td>{p.sku}</td>
+                        <td>{p.categories.map(c => c.name).join(", ")}</td>
+                        <td>{money(p.salePrice || p.price)}{p.salePrice && <small><s>{money(p.price)}</s></small>}</td>
+                        <td className={p.stock <= p.lowStockThreshold ? "attention" : ""}>{p.stock}</td>
+                        <td><StatusBadge value={p.status} /></td>
+                        <td className="row-actions" style={{ display: "flex", gap: "6px", alignItems: "center", justifyContent: "flex-end" }}>
+                          <button onClick={() => setEditor(p)}>Edit</button>
+                          {p.status === "ARCHIVED" ? (
+                            <button 
+                              title="Restore to active catalog" 
+                              style={{ color: "var(--emerald)", display: "inline-flex", alignItems: "center", gap: 4 }} 
+                              onClick={async () => {
+                                const ok = await confirm(`Restore ${p.name} back to active catalog?`, "Restore product");
+                                if (ok) restore.mutate(p.id);
+                              }}
+                            >
+                              <RotateCcw size={14} /> Restore
+                            </button>
+                          ) : (
+                            <button 
+                              aria-label="Archive" 
+                              title="Archive product (hide from store)" 
+                              onClick={async () => await confirm(`Archive ${p.name}? It will disappear from the customer catalog.`, "Archive product") && archive.mutate(p.id)}
+                            >
+                              <Archive size={14} />
+                            </button>
+                          )}
+                          <button 
+                            aria-label="Delete permanently" 
+                            title="Delete permanently" 
+                            style={{ color: "#ff6b6b" }} 
+                            onClick={async () => {
+                              const ok = await confirm(`Permanently delete "${p.name}"? This cannot be undone.`, "Delete permanently");
+                              if (ok) deletePermanent.mutate(p.id);
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -41,6 +41,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const storeName = (settings?.branding?.storeName as string) || "SHADOW SHOP";
   const headerLogo = (settings?.branding?.headerLogo as string) || (settings?.branding?.logo as string);
 
+  const [isWaking, setIsWaking] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => setIsWaking(Boolean(e.detail?.waking));
+    window.addEventListener("shadow_server_waking", handler);
+    return () => window.removeEventListener("shadow_server_waking", handler);
+  }, []);
+
   return (
     <div className="admin-shell">
       <aside className={sidebar ? "sidebar open" : "sidebar"}>
@@ -75,6 +83,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
       {sidebar && <button className="sidebar-shade" onClick={() => setSidebar(false)} aria-label="Close menu" />}
       
       <div className="admin-main">
+        {isWaking && (
+          <div style={{ background: "rgba(212, 175, 55, 0.15)", color: "var(--gold)", borderBottom: "1px solid rgba(212, 175, 55, 0.3)", padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            <span>⚡ Connecting to cloud server (server waking up, please wait a moment)...</span>
+          </div>
+        )}
         <header className="admin-top">
           <button className="mobile-toggle" onClick={() => setSidebar(!sidebar)}><Menu /></button>
           <div>
@@ -82,7 +95,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <b>{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</b>
           </div>
           <div className="top-actions">
-            <a className="store-link" href={import.meta.env.VITE_CUSTOMER_URL || "http://localhost:3000"} target="_blank" rel="noreferrer">View store ↗</a>
+            <a className="store-link" href={import.meta.env.VITE_CUSTOMER_URL || (window.location.hostname.includes("web.app") ? "https://shadow-shop-official-store.web.app" : "http://localhost:3002")} target="_blank" rel="noreferrer">View store ↗</a>
             <button onClick={() => setDark(!dark)} aria-label="Toggle color theme">{dark ? <Sun /> : <Moon />}</button>
             <span className="avatar">{auth.user?.name.slice(0, 2).toUpperCase()}</span>
             <button onClick={auth.logout} aria-label="Sign out"><LogOut /></button>

@@ -1,11 +1,22 @@
 /// <reference types="vite/client" />
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+const PROD_API_URL = "https://shadow-shop-5719.onrender.com/api/v1";
+let activeBaseUrl = import.meta.env.VITE_API_URL || PROD_API_URL;
+
 export const token = () => localStorage.getItem("shadow_admin_token");
 
 export class ApiError extends Error {
   constructor(message: string, public code: string, public status?: number, public fields?: Record<string, string[]>) {
     super(message);
     this.name = "ApiError";
+  }
+}
+
+// Server status notification for Render Free cold starts
+let isServerWaking = false;
+function notifyServerWaking(waking: boolean) {
+  if (isServerWaking !== waking) {
+    isServerWaking = waking;
+    window.dispatchEvent(new CustomEvent("shadow_server_waking", { detail: { waking } }));
   }
 }
 
@@ -17,20 +28,21 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const value = token();
   if (value) headers.set("authorization", `Bearer ${value}`);
 
-  // Bounded timeout to prevent hanging admin operations
+  // Bounded timeout: 45s for cloud cold starts
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
   if (options.signal) {
     options.signal.addEventListener("abort", () => controller.abort());
   }
 
   try {
-    const response = await fetch(`${API}${path}`, {
+    const response = await fetch(`${activeBaseUrl}${path}`, {
       ...options,
       headers,
       signal: controller.signal
     });
     clearTimeout(timeoutId);
+    notifyServerWaking(false);
 
     const payload = await response.json().catch(() => ({
       success: false,
@@ -48,9 +60,22 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     return payload.data as T;
   } catch (err: any) {
     clearTimeout(timeoutId);
+
+    // If local dev server is not running, seamlessly fallback to live cloud Render backend
+    if (err instanceof TypeError && err.message.includes("fetch") && activeBaseUrl.includes("localhost:5000")) {
+      activeBaseUrl = PROD_API_URL;
+      return api<T>(path, options);
+    }
+
+    // Detect cold-start network timeout or failure
+    if (err.name === "AbortError" || (err instanceof TypeError && err.message.includes("fetch"))) {
+      notifyServerWaking(true);
+      fetch(`${activeBaseUrl.replace(/\/api\/v\d+$/, "")}/readiness`).catch(() => {});
+    }
+
     if (err instanceof ApiError) throw err;
     throw new ApiError(
-      err.name === "AbortError" ? "Request timed out." : (err.message || "Network error occurred."),
+      err.name === "AbortError" ? "Request timed out. Server may be starting up, please try again." : (err.message || "Network error occurred."),
       err.name === "AbortError" ? "TIMEOUT" : "NETWORK_ERROR",
       0
     );
@@ -66,6 +91,7 @@ export const resolveImageUrl = (url?: string, fallback = "/assets/product-fallba
     url = "/uploads/" + url.split("/uploads/")[1];
   }
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
-  const base = API.replace(/\/api\/v\d+$/, "");
+  const base = activeBaseUrl.replace(/\/api\/v\d+$/, "");
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 };
+

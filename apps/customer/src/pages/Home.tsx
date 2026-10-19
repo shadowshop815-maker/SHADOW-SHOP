@@ -53,7 +53,7 @@ export function Home() {
     queryFn: async () => {
       try {
         const res = await api<{ items: Product[] }>("/products?sort=featured&limit=8");
-        if (res?.items && res.items.length >= 4) {
+        if (res && Array.isArray(res.items)) {
           return res;
         }
       } catch (err) {

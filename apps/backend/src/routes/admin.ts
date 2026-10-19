@@ -48,27 +48,6 @@ adminRouter.get("/dashboard", asyncHandler(async (_req, res) => {
   return success(res, "Dashboard loaded.", { totalSales: Number(sales._sum.grandTotal || 0), todaySales: Number(todaySales._sum.grandTotal || 0), totalOrders, pendingOrders, processingOrders, deliveredOrders, cancelledOrders, returnRequests, refunds, customers, products, lowStock, outOfStock, recentOrders });
 }));
 
-adminRouter.get("/categories", asyncHandler(async (_req, res) => success(res, "Categories loaded.", await prisma.category.findMany({ include: { _count: { select: { products: true } } }, orderBy: { name: "asc" } }))));
-adminRouter.post("/categories", asyncHandler(async (req, res) => { const name = String(req.body.name || "").trim(); const slug = String(req.body.slug || "").trim(); if (name.length < 2 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new AppError(400, "Enter a valid name and slug.", "VALIDATION_ERROR"); const item = await prisma.category.create({ data: { name, slug, description: String(req.body.description || ""), image: String(req.body.image || ""), active: req.body.active !== false } }); await audit(req.auth!.id, "CATEGORY_CREATE", "Category", item.id); invalidateCatalogCache(); return success(res, "Category created.", item, 201); }));
-adminRouter.patch("/categories/:id", asyncHandler(async (req, res) => { const previous = await prisma.category.findUnique({ where: { id: idParam(req) } }); if (!previous) throw new AppError(404, "Category not found.", "NOT_FOUND"); const newImage = req.body.image !== undefined ? String(req.body.image) : undefined; const item = await prisma.category.update({ where: { id: idParam(req) }, data: { ...(req.body.name !== undefined ? { name: String(req.body.name).trim() } : {}), ...(req.body.slug !== undefined ? { slug: String(req.body.slug).trim() } : {}), ...(req.body.description !== undefined ? { description: String(req.body.description) } : {}), ...(newImage !== undefined ? { image: newImage } : {}), ...(req.body.active !== undefined ? { active: Boolean(req.body.active) } : {}) } }); if (newImage !== undefined && previous.image && previous.image !== newImage) { await deleteMediaSafe(previous.image).catch(() => {}); } await audit(req.auth!.id, "CATEGORY_EDIT", "Category", item.id); invalidateCatalogCache(); return success(res, "Category updated.", item); }));
-
-adminRouter.get("/products", asyncHandler(async (req, res) => { const { page, limit } = pageInfo(req); const search = String(req.query.search || ""); const status = String(req.query.status || ""); const where: Prisma.ProductWhereInput = { ...(search ? { OR: [{ name: { contains: search } }, { sku: { contains: search } }] } : {}), ...(status === "LOW_STOCK" ? { OR: [{ status: "OUT_OF_STOCK" }, { stock: { lte: 10 } }] } : status ? { status: status as any } : {}) }; const [items, total] = await prisma.$transaction([prisma.product.findMany({ where, include: { categories: true, images: { orderBy: { position: "asc" } } }, orderBy: { updatedAt: "desc" }, skip: (page - 1) * limit, take: limit }), prisma.product.count({ where })]); return success(res, "Products loaded.", paged(items, total, page, limit)); }));
-adminRouter.post("/products", asyncHandler(async (req, res) => { const input = productSchema.parse(req.body); const { images, categories, taxProfileId, hsnCode, taxMode, ...data } = input; const item = await prisma.product.create({ data: { ...data, sizes: JSON.stringify(data.sizes), colors: JSON.stringify(data.colors), tags: JSON.stringify(data.tags), salePrice: data.salePrice ?? null, costPrice: data.costPrice ?? null, weight: data.weight ?? null, hsnCode: hsnCode ?? null, taxProfileId: taxProfileId ?? null, taxMode: taxMode ?? "INCLUSIVE", status: data.stock === 0 && data.status === "ACTIVE" ? "OUT_OF_STOCK" : data.status, images: { create: images.map((img: any, position: number) => ({ url: img.url, position, alt: data.name, color: img.color || null })) }, categories: { connectOrCreate: categories.map((name: string) => ({ where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") }, create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") } })) } }, include: { categories: true, images: true, taxProfile: true } }); await prisma.inventoryMovement.create({ data: { productId: item.id, type: "SET", quantity: item.stock, before: 0, after: item.stock, reason: "Initial stock" } }); await audit(req.auth!.id, "PRODUCT_CREATE", "Product", item.id, { sku: item.sku }); invalidateCatalogCache(); return success(res, "Product created.", item, 201); }));
-adminRouter.patch("/products/:id", asyncHandler(async (req, res) => { const input = productSchema.parse(req.body); const previous = await prisma.product.findUnique({ where: { id: idParam(req) } }); if (!previous) throw new AppError(404, "Product not found.", "NOT_FOUND"); const { images, categories, taxProfileId, hsnCode, taxMode, ...data } = input; const item = await prisma.$transaction(async (tx: any) => { const previousImages = await tx.productImage.findMany({ where: { productId: previous.id } }); await tx.productImage.deleteMany({ where: { productId: previous.id } }); const updated = await tx.product.update({ where: { id: previous.id }, data: { ...data, sizes: JSON.stringify(data.sizes), colors: JSON.stringify(data.colors), tags: JSON.stringify(data.tags), salePrice: data.salePrice ?? null, costPrice: data.costPrice ?? null, weight: data.weight ?? null, hsnCode: hsnCode ?? null, taxProfileId: taxProfileId ?? null, taxMode: taxMode ?? "INCLUSIVE", status: data.stock === 0 && data.status === "ACTIVE" ? "OUT_OF_STOCK" : data.status, images: { create: images.map((img: any, position: number) => ({ url: img.url, position, alt: data.name, color: img.color || null })) }, categories: { set: [], connectOrCreate: categories.map((name: string) => ({ where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") }, create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") } })) } }, include: { categories: true, images: true, taxProfile: true } }); if (previous.stock !== updated.stock) await tx.inventoryMovement.create({ data: { productId: updated.id, type: "SET", quantity: updated.stock - previous.stock, before: previous.stock, after: updated.stock, reason: "Admin product edit" } }); const newImageUrls = new Set(images.map((i: any) => i.url)); for (const oldImg of previousImages) { if (!newImageUrls.has(oldImg.url)) { await deleteMediaSafe(oldImg.url).catch(() => {}); } } return updated; }); await audit(req.auth!.id, "PRODUCT_EDIT", "Product", item.id, { oldPrice: String(previous.price), newPrice: String(item.price), oldStock: previous.stock, newStock: item.stock }); invalidateCatalogCache(); return success(res, "Product updated.", item); }));
-adminRouter.delete("/products/:id", asyncHandler(async (req, res) => { const item = await prisma.product.update({ where: { id: idParam(req) }, data: { status: "ARCHIVED" } }); await audit(req.auth!.id, "PRODUCT_ARCHIVE", "Product", item.id); invalidateCatalogCache(); return success(res, "Product archived.", item); }));
-
-adminRouter.get("/inventory", asyncHandler(async (req, res) => { const { page, limit } = pageInfo(req); const low = req.query.low === "true"; const where: Prisma.ProductWhereInput = low ? { stock: { lte: 5 }, status: { not: "ARCHIVED" } } : { status: { not: "ARCHIVED" } }; const [items, total] = await prisma.$transaction([prisma.product.findMany({ where, select: { id: true, name: true, sku: true, stock: true, lowStockThreshold: true, status: true, updatedAt: true }, orderBy: { stock: "asc" }, skip: (page - 1) * limit, take: limit }), prisma.product.count({ where })]); return success(res, "Inventory loaded.", paged(items, total, page, limit)); }));
-adminRouter.patch("/inventory/:id", asyncHandler(async (req, res) => { const mode = String(req.body.mode || "SET") as "SET" | "ADD" | "REDUCE"; const quantity = Number(req.body.quantity); if (!Number.isInteger(quantity) || quantity < 0 || !["SET", "ADD", "REDUCE"].includes(mode)) throw new AppError(400, "Enter a valid stock adjustment.", "VALIDATION_ERROR"); const product = await prisma.product.findUnique({ where: { id: idParam(req) } }); if (!product) throw new AppError(404, "Product not found.", "NOT_FOUND"); const after = mode === "SET" ? quantity : mode === "ADD" ? product.stock + quantity : product.stock - quantity; if (after < 0) throw new AppError(409, "Stock cannot be negative.", "NEGATIVE_STOCK"); const updated = await prisma.$transaction(async (tx: any) => { const item = await tx.product.update({ where: { id: product.id }, data: { stock: after, ...(after === 0 ? { status: "OUT_OF_STOCK" } : product.status === "OUT_OF_STOCK" ? { status: "ACTIVE" } : {}) } }); await tx.inventoryMovement.create({ data: { productId: product.id, type: mode, quantity: after - product.stock, before: product.stock, after, reason: String(req.body.reason || "Admin stock adjustment") } }); return item; }); await audit(req.auth!.id, "STOCK_CHANGE", "Product", product.id, { before: product.stock, after }); invalidateCatalogCache(); return success(res, "Stock updated.", updated); }));
-adminRouter.get("/inventory/:id/movements", asyncHandler(async (req, res) => success(res, "Stock history loaded.", await prisma.inventoryMovement.findMany({ where: { productId: idParam(req) }, orderBy: { createdAt: "desc" }, take: 100 }))));
-
-if (!fs.existsSync(uploadDirectory)) fs.mkdirSync(uploadDirectory, { recursive: true });
-const accepted = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "video/mp4", "application/pdf"]);
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: env.MAX_UPLOAD_MB * 1024 * 1024 },
-  fileFilter: (_req, file, callback) => callback(null, accepted.has(file.mimetype) && [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".mp4", ".pdf"].includes(path.extname(file.originalname).toLowerCase()))
-});
-
 async function deleteMediaSafe(url: string) {
   if (!url) return;
   try {
@@ -89,6 +68,146 @@ async function deleteMediaSafe(url: string) {
     console.error("[Media Deletion Error]", url, err);
   }
 }
+
+async function deleteProductPermanently(tx: any, productId: string) {
+  const orderItemsCount = await tx.orderItem.count({ where: { productId } });
+  if (orderItemsCount > 0) {
+    throw new AppError(400, "Cannot permanently delete product because it has past customer orders. Please archive it instead.", "HAS_ORDERS");
+  }
+
+  await tx.cartItem.deleteMany({ where: { productId } });
+  await tx.wishlistItem.deleteMany({ where: { productId } });
+  await tx.offerProductRule.deleteMany({ where: { productId } });
+  await tx.inventoryMovement.deleteMany({ where: { productId } });
+
+  const reviews = await tx.productReview.findMany({ where: { productId }, select: { id: true } });
+  for (const r of reviews) {
+    await tx.reviewReply.deleteMany({ where: { reviewId: r.id } });
+    await tx.reviewVote.deleteMany({ where: { reviewId: r.id } });
+    await tx.reviewImage.deleteMany({ where: { reviewId: r.id } });
+    await tx.reviewModerationAudit.deleteMany({ where: { reviewId: r.id } });
+  }
+  await tx.productReview.deleteMany({ where: { productId } });
+
+  const images = await tx.productImage.findMany({ where: { productId } });
+  for (const img of images) {
+    await deleteMediaSafe(img.url).catch(() => {});
+  }
+  await tx.productImage.deleteMany({ where: { productId } });
+  await tx.productVariant.deleteMany({ where: { productId } });
+  return tx.product.delete({ where: { id: productId } });
+}
+
+adminRouter.get("/categories", asyncHandler(async (_req, res) => success(res, "Categories loaded.", await prisma.category.findMany({ include: { _count: { select: { products: true } } }, orderBy: { name: "asc" } }))));
+adminRouter.post("/categories", asyncHandler(async (req, res) => { const name = String(req.body.name || "").trim(); const slug = String(req.body.slug || "").trim(); if (name.length < 2 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new AppError(400, "Enter a valid name and slug.", "VALIDATION_ERROR"); const item = await prisma.category.create({ data: { name, slug, description: String(req.body.description || ""), image: String(req.body.image || ""), active: req.body.active !== false } }); await audit(req.auth!.id, "CATEGORY_CREATE", "Category", item.id); invalidateCatalogCache(); return success(res, "Category created.", item, 201); }));
+adminRouter.patch("/categories/:id", asyncHandler(async (req, res) => { const previous = await prisma.category.findUnique({ where: { id: idParam(req) } }); if (!previous) throw new AppError(404, "Category not found.", "NOT_FOUND"); const newImage = req.body.image !== undefined ? String(req.body.image) : undefined; const item = await prisma.category.update({ where: { id: idParam(req) }, data: { ...(req.body.name !== undefined ? { name: String(req.body.name).trim() } : {}), ...(req.body.slug !== undefined ? { slug: String(req.body.slug).trim() } : {}), ...(req.body.description !== undefined ? { description: String(req.body.description) } : {}), ...(newImage !== undefined ? { image: newImage } : {}), ...(req.body.active !== undefined ? { active: Boolean(req.body.active) } : {}) } }); if (newImage !== undefined && previous.image && previous.image !== newImage) { await deleteMediaSafe(previous.image).catch(() => {}); } await audit(req.auth!.id, "CATEGORY_EDIT", "Category", item.id); invalidateCatalogCache(); return success(res, "Category updated.", item); }));
+adminRouter.delete("/categories/:id", asyncHandler(async (req, res) => {
+  const id = idParam(req);
+  const category = await prisma.category.findUnique({ where: { id }, include: { _count: { select: { products: true } } } });
+  if (!category) throw new AppError(404, "Category not found.", "NOT_FOUND");
+  if (category._count.products > 0) {
+    throw new AppError(400, `Cannot delete category because ${category._count.products} products belong to it. Please reassign or remove them first.`, "CATEGORY_IN_USE");
+  }
+  if (category.image) {
+    await deleteMediaSafe(category.image).catch(() => {});
+  }
+  await prisma.category.delete({ where: { id } });
+  await audit(req.auth!.id, "CATEGORY_DELETE", "Category", id, { name: category.name });
+  invalidateCatalogCache();
+  return success(res, "Category deleted.", { id });
+}));
+
+adminRouter.get("/products", asyncHandler(async (req, res) => { const { page, limit } = pageInfo(req); const search = String(req.query.search || ""); const status = String(req.query.status || ""); const where: Prisma.ProductWhereInput = { ...(search ? { OR: [{ name: { contains: search } }, { sku: { contains: search } }] } : {}), ...(status === "LOW_STOCK" ? { OR: [{ status: "OUT_OF_STOCK" }, { stock: { lte: 10 } }] } : status ? { status: status as any } : {}) }; const [items, total] = await prisma.$transaction([prisma.product.findMany({ where, include: { categories: true, images: { orderBy: { position: "asc" } } }, orderBy: { updatedAt: "desc" }, skip: (page - 1) * limit, take: limit }), prisma.product.count({ where })]); return success(res, "Products loaded.", paged(items, total, page, limit)); }));
+adminRouter.post("/products", asyncHandler(async (req, res) => { const input = productSchema.parse(req.body); const { images, categories, taxProfileId, hsnCode, taxMode, ...data } = input; const item = await prisma.product.create({ data: { ...data, sizes: JSON.stringify(data.sizes), colors: JSON.stringify(data.colors), tags: JSON.stringify(data.tags), salePrice: data.salePrice ?? null, costPrice: data.costPrice ?? null, weight: data.weight ?? null, hsnCode: hsnCode ?? null, taxProfileId: taxProfileId ?? null, taxMode: taxMode ?? "INCLUSIVE", status: data.stock === 0 && data.status === "ACTIVE" ? "OUT_OF_STOCK" : data.status, images: { create: images.map((img: any, position: number) => ({ url: img.url, position, alt: data.name, color: img.color || null })) }, categories: { connectOrCreate: categories.map((name: string) => ({ where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") }, create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") } })) } }, include: { categories: true, images: true, taxProfile: true } }); await prisma.inventoryMovement.create({ data: { productId: item.id, type: "SET", quantity: item.stock, before: 0, after: item.stock, reason: "Initial stock" } }); await audit(req.auth!.id, "PRODUCT_CREATE", "Product", item.id, { sku: item.sku }); invalidateCatalogCache(); return success(res, "Product created.", item, 201); }));
+adminRouter.patch("/products/:id", asyncHandler(async (req, res) => { const input = productSchema.parse(req.body); const previous = await prisma.product.findUnique({ where: { id: idParam(req) } }); if (!previous) throw new AppError(404, "Product not found.", "NOT_FOUND"); const { images, categories, taxProfileId, hsnCode, taxMode, ...data } = input; const item = await prisma.$transaction(async (tx: any) => { const previousImages = await tx.productImage.findMany({ where: { productId: previous.id } }); await tx.productImage.deleteMany({ where: { productId: previous.id } }); const updated = await tx.product.update({ where: { id: previous.id }, data: { ...data, sizes: JSON.stringify(data.sizes), colors: JSON.stringify(data.colors), tags: JSON.stringify(data.tags), salePrice: data.salePrice ?? null, costPrice: data.costPrice ?? null, weight: data.weight ?? null, hsnCode: hsnCode ?? null, taxProfileId: taxProfileId ?? null, taxMode: taxMode ?? "INCLUSIVE", status: data.stock === 0 && data.status === "ACTIVE" ? "OUT_OF_STOCK" : data.status, images: { create: images.map((img: any, position: number) => ({ url: img.url, position, alt: data.name, color: img.color || null })) }, categories: { set: [], connectOrCreate: categories.map((name: string) => ({ where: { slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") }, create: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") } })) } }, include: { categories: true, images: true, taxProfile: true } }); if (previous.stock !== updated.stock) await tx.inventoryMovement.create({ data: { productId: updated.id, type: "SET", quantity: updated.stock - previous.stock, before: previous.stock, after: updated.stock, reason: "Admin product edit" } }); const newImageUrls = new Set(images.map((i: any) => i.url)); for (const oldImg of previousImages) { if (!newImageUrls.has(oldImg.url)) { await deleteMediaSafe(oldImg.url).catch(() => {}); } } return updated; }); await audit(req.auth!.id, "PRODUCT_EDIT", "Product", item.id, { oldPrice: String(previous.price), newPrice: String(item.price), oldStock: previous.stock, newStock: item.stock }); invalidateCatalogCache(); return success(res, "Product updated.", item); }));
+adminRouter.delete("/products/:id", asyncHandler(async (req, res) => {
+  const id = idParam(req);
+  const permanent = req.query.permanent === "true" || req.body?.permanent === true;
+  
+  if (permanent) {
+    const item = await prisma.product.findUnique({ where: { id } });
+    if (!item) throw new AppError(404, "Product not found.", "NOT_FOUND");
+    
+    await prisma.$transaction(async (tx: any) => {
+      await deleteProductPermanently(tx, id);
+    });
+
+    await audit(req.auth!.id, "PRODUCT_DELETE_PERMANENT", "Product", id, { name: item.name, sku: item.sku });
+    invalidateCatalogCache();
+    return success(res, "Product permanently deleted.", { id, name: item.name });
+  }
+
+  const item = await prisma.product.update({ where: { id }, data: { status: "ARCHIVED" } });
+  await audit(req.auth!.id, "PRODUCT_ARCHIVE", "Product", item.id);
+  invalidateCatalogCache();
+  return success(res, "Product archived.", item);
+}));
+
+adminRouter.post("/products/:id/restore", asyncHandler(async (req, res) => {
+  const id = idParam(req);
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new AppError(404, "Product not found.", "NOT_FOUND");
+  const nextStatus = existing.stock > 0 ? "ACTIVE" : "OUT_OF_STOCK";
+  const item = await prisma.product.update({
+    where: { id },
+    data: { status: nextStatus }
+  });
+  await audit(req.auth!.id, "PRODUCT_RESTORE", "Product", item.id);
+  invalidateCatalogCache();
+  return success(res, "Product restored to catalog.", item);
+}));
+
+adminRouter.post("/catalog/clean-demo", asyncHandler(async (req, res) => {
+  const demoSkus = ["SS-HD-001", "SS-JKT-001", "SS-SHIRT-004", "SS-SHIRT-003", "SS-TEE-002", "SS-TEE-001", "SS-SHIRT-002", "SS-SHIRT-001"];
+  const demoSlugs = [
+    "loopback-french-terry-oversized-hoodie-charcoal",
+    "deep-indigo-classic-denim-trucker-jacket",
+    "autumn-rust-checkered-flannel-overshirt",
+    "men-textured-charcoal-grid-casual-shirt",
+    "minimalist-raw-white-heavyweight-tee",
+    "heavyweight-oversized-tee-vintage-black",
+    "men-vintage-mint-green-poplin-shirt",
+    "shadow-signature-oxford-shirt"
+  ];
+  
+  const demoProducts = await prisma.product.findMany({
+    where: {
+      OR: [
+        { sku: { in: demoSkus } },
+        { slug: { in: demoSlugs } }
+      ]
+    }
+  });
+
+  const deleted: string[] = [];
+  for (const prod of demoProducts) {
+    try {
+      await prisma.$transaction(async (tx: any) => {
+        await deleteProductPermanently(tx, prod.id);
+      });
+      deleted.push(prod.name);
+    } catch {
+      await prisma.product.update({ where: { id: prod.id }, data: { status: "ARCHIVED" } });
+      deleted.push(`${prod.name} (Archived)`);
+    }
+  }
+
+  await audit(req.auth!.id, "CLEAN_DEMO_PRODUCTS", "Catalog", undefined, { deletedCount: deleted.length, items: deleted });
+  invalidateCatalogCache();
+  return success(res, `Cleaned ${deleted.length} demo product(s).`, { count: deleted.length, deleted });
+}));
+
+adminRouter.get("/inventory", asyncHandler(async (req, res) => { const { page, limit } = pageInfo(req); const low = req.query.low === "true"; const where: Prisma.ProductWhereInput = low ? { stock: { lte: 5 }, status: { not: "ARCHIVED" } } : { status: { not: "ARCHIVED" } }; const [items, total] = await prisma.$transaction([prisma.product.findMany({ where, select: { id: true, name: true, sku: true, stock: true, lowStockThreshold: true, status: true, updatedAt: true }, orderBy: { stock: "asc" }, skip: (page - 1) * limit, take: limit }), prisma.product.count({ where })]); return success(res, "Inventory loaded.", paged(items, total, page, limit)); }));
+adminRouter.patch("/inventory/:id", asyncHandler(async (req, res) => { const mode = String(req.body.mode || "SET") as "SET" | "ADD" | "REDUCE"; const quantity = Number(req.body.quantity); if (!Number.isInteger(quantity) || quantity < 0 || !["SET", "ADD", "REDUCE"].includes(mode)) throw new AppError(400, "Enter a valid stock adjustment.", "VALIDATION_ERROR"); const product = await prisma.product.findUnique({ where: { id: idParam(req) } }); if (!product) throw new AppError(404, "Product not found.", "NOT_FOUND"); const after = mode === "SET" ? quantity : mode === "ADD" ? product.stock + quantity : product.stock - quantity; if (after < 0) throw new AppError(409, "Stock cannot be negative.", "NEGATIVE_STOCK"); const updated = await prisma.$transaction(async (tx: any) => { const item = await tx.product.update({ where: { id: product.id }, data: { stock: after, ...(after === 0 ? { status: "OUT_OF_STOCK" } : product.status === "OUT_OF_STOCK" ? { status: "ACTIVE" } : {}) } }); await tx.inventoryMovement.create({ data: { productId: product.id, type: mode, quantity: after - product.stock, before: product.stock, after, reason: String(req.body.reason || "Admin stock adjustment") } }); return item; }); await audit(req.auth!.id, "STOCK_CHANGE", "Product", product.id, { before: product.stock, after }); invalidateCatalogCache(); return success(res, "Stock updated.", updated); }));
+adminRouter.get("/inventory/:id/movements", asyncHandler(async (req, res) => success(res, "Stock history loaded.", await prisma.inventoryMovement.findMany({ where: { productId: idParam(req) }, orderBy: { createdAt: "desc" }, take: 100 }))));
+
+if (!fs.existsSync(uploadDirectory)) fs.mkdirSync(uploadDirectory, { recursive: true });
+const accepted = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml", "video/mp4", "application/pdf"]);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: env.MAX_UPLOAD_MB * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => callback(null, accepted.has(file.mimetype) && [".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg", ".mp4", ".pdf"].includes(path.extname(file.originalname).toLowerCase()))
+});
 
 adminRouter.post("/uploads", upload.single("file"), asyncHandler(async (req, res) => {
   if (!req.file) throw new AppError(400, "Select a supported image, video, or PDF file.", "INVALID_UPLOAD");

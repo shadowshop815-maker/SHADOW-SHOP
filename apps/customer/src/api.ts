@@ -144,10 +144,6 @@ const DEFAULT_STUDIO_FALLBACK = "https://images.unsplash.com/photo-1596755094514
 export const resolveImageUrl = (url?: string | null, fallback = DEFAULT_STUDIO_FALLBACK) => {
   if (!url || String(url).trim() === "") return fallback;
 
-  // Intercept old promotional flyer graphic stamped with conflicting price text
-  if (url.includes("1791542599420-508515da-74a5-4c0a-8afb-6e6fb1d1f993")) {
-    return DEFAULT_STUDIO_FALLBACK;
-  }
 
   // Intercept demo vector SVGs and map to studio photography
   if (url.includes(".svg")) {

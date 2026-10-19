@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 import { api } from "../../api";
+import { useConfirm } from "../../features/confirm/ConfirmContext";
 import { PageHead, Loading, ErrorState, StatusBadge, Field, TextField } from "../../components/ui";
 import type { Category } from "./Products";
 
 export function Categories() {
   const client = useQueryClient();
+  const confirm = useConfirm();
   const { data = [], isLoading, error } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: () => api<Category[]>("/admin/categories")
@@ -22,6 +25,15 @@ export function Categories() {
       setForm({ id: "", name: "", slug: "", description: "", active: true });
       client.invalidateQueries({ queryKey: ["admin-categories"] });
     }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api(`/admin/categories/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      setForm({ id: "", name: "", slug: "", description: "", active: true });
+      client.invalidateQueries({ queryKey: ["admin-categories"] });
+    },
+    onError: (err: any) => alert(err.message || "Failed to delete category.")
   });
   
   return (
@@ -75,10 +87,25 @@ export function Categories() {
             <input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} />
             Active
           </label>
-          {mutation.error && <p className="form-error">{mutation.error.message}</p>}
-          <button className="primary" disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving…" : form.id ? "Save category" : "Create category"}
-          </button>
+          <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+            <button type="submit" className="primary" disabled={mutation.isPending} style={{ flex: 1 }}>
+              {mutation.isPending ? "Saving…" : form.id ? "Save category" : "Create category"}
+            </button>
+            {form.id && (
+              <button 
+                type="button" 
+                className="ghost" 
+                style={{ color: "var(--red)", border: "1px solid rgba(255, 80, 80, 0.3)", display: "flex", alignItems: "center", gap: 6 }}
+                disabled={deleteMutation.isPending}
+                onClick={async () => {
+                  const ok = await confirm(`Delete category "${form.name}"? Only categories with 0 products can be deleted.`, "Delete Category");
+                  if (ok) deleteMutation.mutate(form.id);
+                }}
+              >
+                <Trash2 size={16} /> Delete
+              </button>
+            )}
+          </div>
         </form>
       </div>
     </>

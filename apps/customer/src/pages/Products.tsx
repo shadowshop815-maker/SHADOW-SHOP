@@ -25,11 +25,11 @@ export function Products() {
     queryFn: async () => {
       try {
         const res = await api<{ items: Product[]; pagination: { page: number; pages: number; total: number } }>(path);
-        if (res?.items && res.items.length >= 4) {
+        if (res && Array.isArray(res.items)) {
           return res;
         }
       } catch (err) {
-        // Fallback to static snapshot
+        // Fallback to static snapshot only on network/server error
       }
 
       try {

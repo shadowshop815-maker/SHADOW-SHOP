@@ -30,7 +30,7 @@ export function ProductDetail() {
           if (snapRes.ok) {
             const snapshot = await snapRes.json();
             const items: any[] = snapshot?.data?.items || [];
-            const found = items.find((it: any) => it.slug === slug || it.id === slug) || items[0];
+            const found = items.find((it: any) => it.slug === slug || it.id === slug);
             if (found) {
               const related = items.filter((it: any) => it.id !== found.id);
               const parseArr = (val: any) => {
