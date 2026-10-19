@@ -11,6 +11,21 @@ import { enqueueEmailJob, triggerDispatch } from "../services/email/dispatcher.j
 
 export const commerceRouter = Router();
 
+// Module-level settings cache — avoids a DB round-trip on every cart read.
+// TTL: 2 minutes. Refreshed lazily on expiry.
+let _settingsCache: any = null;
+let _settingsCacheAt = 0;
+const SETTINGS_TTL_MS = 120_000;
+async function getCachedSettings() {
+  const now = Date.now();
+  if (_settingsCache && now - _settingsCacheAt < SETTINGS_TTL_MS) return _settingsCache;
+  let s = await prisma.storeSettings.findUnique({ where: { id: 1 } });
+  if (!s) s = await prisma.storeSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  _settingsCache = s;
+  _settingsCacheAt = now;
+  return s;
+}
+
 const cartInclude = { items: { include: { product: { include: { categories: true, images: { orderBy: { position: "asc" as const } } } } }, orderBy: { id: "asc" as const } } };
 const cartKey = (req: any) => String(req.headers["x-cart-key"] || "").trim();
 
@@ -27,8 +42,7 @@ async function getCart(req: any, create = true) {
 }
 
 async function cartView(req: any, cart: NonNullable<Awaited<ReturnType<typeof getCart>>>) {
-  let settings = await prisma.storeSettings.findUnique({ where: { id: 1 } });
-  if (!settings) settings = await prisma.storeSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  let settings = await getCachedSettings();
   let subtotal = 0; let baseDiscount = 0; let totalTax = 0; let exclusiveTaxToAdd = 0;
   const taxRate = settings.taxRate / 100;
   
@@ -586,4 +600,42 @@ commerceRouter.post("/orders/:id/returns", requireAuth, asyncHandler(async (req,
     return created;
   });
   return success(res, "Return requested.", request, 201);
+}));
+
+// ----- WISHLIST ENDPOINTS -----
+
+async function getWishlist(req: any, create = true) {
+  const include = { items: { include: { product: { include: { categories: true, images: { orderBy: { position: "asc" as const } } } } }, orderBy: { createdAt: "desc" as const } } };
+  if (req.auth) {
+    const found = await prisma.wishlist.findFirst({ where: { userId: req.auth.id }, include });
+    if (found || !create) return found;
+    return prisma.wishlist.create({ data: { userId: req.auth.id }, include });
+  }
+  const key = cartKey(req);
+  if (!key) throw new AppError(400, "A cart key is required.", "CART_KEY_REQUIRED");
+  const found = await prisma.wishlist.findUnique({ where: { guestKey: key }, include });
+  if (found || !create) return found;
+  return prisma.wishlist.create({ data: { guestKey: key }, include });
+}
+
+commerceRouter.get(["/wishlist", "/commerce/wishlist"], optionalAuth, asyncHandler(async (req, res) => {
+  const wishlist = await getWishlist(req);
+  return success(res, "Wishlist loaded.", wishlist);
+}));
+
+commerceRouter.post(["/wishlist/items", "/commerce/wishlist/items"], optionalAuth, asyncHandler(async (req, res) => {
+  const productId = String(req.body.productId || "");
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product || product.status !== "ACTIVE") throw new AppError(404, "This product is not available.", "PRODUCT_UNAVAILABLE");
+  const wishlist = (await getWishlist(req))!;
+  const existing = await prisma.wishlistItem.findUnique({ where: { wishlistId_productId: { wishlistId: wishlist.id, productId } } });
+  if (!existing) await prisma.wishlistItem.create({ data: { wishlistId: wishlist.id, productId } });
+  return success(res, "Added to wishlist.", await getWishlist(req), 201);
+}));
+
+commerceRouter.delete(["/wishlist/items/:productId", "/commerce/wishlist/items/:productId"], optionalAuth, asyncHandler(async (req, res) => {
+  const wishlist = (await getWishlist(req))!;
+  const existing = await prisma.wishlistItem.findUnique({ where: { wishlistId_productId: { wishlistId: wishlist.id, productId: req.params.productId } } });
+  if (existing) await prisma.wishlistItem.delete({ where: { id: existing.id } });
+  return success(res, "Removed from wishlist.", await getWishlist(req));
 }));

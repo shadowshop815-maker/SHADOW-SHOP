@@ -22,26 +22,28 @@ const paged = <T>(items: T[], total: number, page: number, limit: number) => ({ 
 
 adminRouter.get("/dashboard", asyncHandler(async (_req, res) => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const [sales, todaySales, totalOrders, pendingOrders] = await Promise.all([
+  // All 10 queries in a single parallel batch — no sequential waterfalls
+  const [
+    sales, todaySales, totalOrders, pendingOrders,
+    processingOrders, deliveredOrders, cancelledOrders, returnRequests, refunds,
+    customers, products, lowStock, outOfStock, recentOrders
+  ] = await Promise.all([
     prisma.order.aggregate({ where: { orderStatus: { not: "CANCELLED" } }, _sum: { grandTotal: true } }),
     prisma.order.aggregate({ where: { createdAt: { gte: today }, orderStatus: { not: "CANCELLED" } }, _sum: { grandTotal: true } }),
     prisma.order.count(),
-    prisma.order.count({ where: { orderStatus: "PENDING" } })
-  ]);
-  const [processingOrders, deliveredOrders, cancelledOrders, returnRequests, refunds] = await Promise.all([
+    prisma.order.count({ where: { orderStatus: "PENDING" } }),
     prisma.order.count({ where: { orderStatus: { in: ["CONFIRMED", "PROCESSING", "PACKED", "SHIPPED", "OUT_FOR_DELIVERY"] } } }),
     prisma.order.count({ where: { orderStatus: "DELIVERED" } }),
     prisma.order.count({ where: { orderStatus: "CANCELLED" } }),
     prisma.returnRequest.count({ where: { status: "REQUESTED" } }),
-    prisma.refund.count()
-  ]);
-  const [customers, products, lowStock, outOfStock, recentOrders] = await Promise.all([
+    prisma.refund.count(),
     prisma.user.count({ where: { role: "CUSTOMER" } }),
     prisma.product.count({ where: { status: { not: "ARCHIVED" } } }),
     prisma.product.count({ where: { stock: { gt: 0, lte: 5 } } }),
     prisma.product.count({ where: { stock: 0 } }),
     prisma.order.findMany({ include: { customer: { select: { name: true, email: true } }, items: true }, orderBy: { createdAt: "desc" }, take: 8 })
   ]);
+  res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
   return success(res, "Dashboard loaded.", { totalSales: Number(sales._sum.grandTotal || 0), todaySales: Number(todaySales._sum.grandTotal || 0), totalOrders, pendingOrders, processingOrders, deliveredOrders, cancelledOrders, returnRequests, refunds, customers, products, lowStock, outOfStock, recentOrders });
 }));
 

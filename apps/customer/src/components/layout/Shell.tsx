@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search, CircleUserRound, ShoppingBag, Menu, X, Sun, Moon, Sparkles } from "lucide-react";
+import { Search, CircleUserRound, ShoppingBag, Menu, X, Sun, Moon, Sparkles, Heart } from "lucide-react";
 import { api, money } from "../../api";
 import type { Cart, StoreData } from "../../types";
 import { useAuth } from "../../features/auth/AuthContext";
@@ -26,6 +26,31 @@ export function Shell({ children }: { children: ReactNode }) {
     queryKey: ["cart"],
     queryFn: () => api<Cart>("/cart")
   });
+
+  const [wishlistCount, setWishlistCount] = useState<number>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("shadow_wishlist") || "[]").length;
+    } catch {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    const updateWishlistCount = () => {
+      try {
+        const list = JSON.parse(localStorage.getItem("shadow_wishlist") || "[]");
+        setWishlistCount(Array.isArray(list) ? list.length : 0);
+      } catch {
+        setWishlistCount(0);
+      }
+    };
+    window.addEventListener("storage", updateWishlistCount);
+    window.addEventListener("shadow_wishlist_updated", updateWishlistCount);
+    return () => {
+      window.removeEventListener("storage", updateWishlistCount);
+      window.removeEventListener("shadow_wishlist_updated", updateWishlistCount);
+    };
+  }, []);
 
   // Track scroll position for subtle frosted glass transition
   useEffect(() => {
@@ -180,6 +205,19 @@ export function Shell({ children }: { children: ReactNode }) {
               <Search size={17} />
               <span className="desktop-only">Search</span>
               <span className="mobile-only">Search</span>
+            </NavLink>
+            
+            <NavLink
+              to="/wishlist"
+              className="wishlist-link"
+              aria-label={`Wishlist with ${wishlistCount} items`}
+            >
+              <Heart size={17} />
+              <span className="desktop-only">Wishlist</span>
+              <span className="mobile-only">Wishlist</span>
+              {wishlistCount > 0 ? (
+                <i>{wishlistCount}</i>
+              ) : null}
             </NavLink>
 
             <NavLink to={auth.user ? "/account" : "/login"} aria-label="Account">

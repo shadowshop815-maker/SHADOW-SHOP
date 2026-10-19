@@ -218,7 +218,7 @@ export function Home() {
           <StaggerContainer className="product-grid">
             {products?.items.slice(0, 8).map((product, idx) => (
               <StaggerItem key={product.id} index={idx} baseDelay={70}>
-                <ProductCard product={product} />
+                <ProductCard product={product} priority={idx < 4} />
               </StaggerItem>
             ))}
           </StaggerContainer>

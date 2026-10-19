@@ -212,14 +212,25 @@ export function Products() {
 
       {/* Product Grid or States */}
       {isLoading ? (
-        <Spinner />
+        <div className="product-grid">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", background: "var(--card)", border: "1px solid var(--border)" }}>
+              <div style={{ aspectRatio: "4/5", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite" }} />
+              <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ height: 12, width: "50%", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite", borderRadius: 4 }} />
+                <div style={{ height: 16, width: "80%", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite", borderRadius: 4 }} />
+                <div style={{ height: 14, width: "35%", background: "linear-gradient(90deg, var(--layer-2) 0%, var(--layer-3) 50%, var(--layer-2) 100%)", backgroundSize: "200% 100%", animation: "shimmer 1.8s ease-in-out infinite", borderRadius: 4 }} />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <Status error={error} empty={!data?.items.length}>
           {data?.items && data.items.length > 0 ? (
             <StaggerContainer className="product-grid">
               {data.items.map((product, idx) => (
                 <StaggerItem key={product.id} index={idx} baseDelay={60}>
-                  <ProductCard product={product} />
+                  <ProductCard product={product} priority={idx < 4} />
                 </StaggerItem>
               ))}
             </StaggerContainer>

@@ -29,6 +29,7 @@ model User {
   moderatorActions ModerationAction[] @relation("Moderator")
   auditLogs        AdminAuditLog[]
   offerRedemptions OfferRedemption[]
+  wishlists        Wishlist[]
 
   @@index([role])
 }
@@ -128,6 +129,7 @@ model Product {
   orderItems        OrderItem[]
   inventory         InventoryMovement[]
   offerRules        OfferProductRule[]
+  wishlistItems     WishlistItem[]
   taxProfile        TaxProfile?         @relation(fields: [taxProfileId], references: [id])
 
   @@index([status, featured])
@@ -163,6 +165,8 @@ model ProductVariant {
 
   product      Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   taxProfile   TaxProfile? @relation("ProductVariantToTaxProfile", fields: [taxProfileId], references: [id])
+
+  @@index([productId])
 }
 
 model Cart {
@@ -192,6 +196,29 @@ model CartItem {
   product       Product @relation(fields: [productId], references: [id])
 
   @@unique([cartId, productId, selectedSize, selectedColor])
+}
+
+model Wishlist {
+  id        String         @id @default(uuid())
+  userId    String?
+  guestKey  String?        @unique
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     WishlistItem[]
+
+  @@index([userId])
+}
+
+model WishlistItem {
+  id         String   @id @default(uuid())
+  wishlistId String
+  productId  String
+  createdAt  DateTime @default(now())
+  wishlist   Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@unique([wishlistId, productId])
 }
 
 model Order {
@@ -279,6 +306,9 @@ model OrderItem {
   order                Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product              Product      @relation(fields: [productId], references: [id])
   returnItems          ReturnItem[]
+
+  @@index([orderId])
+  @@index([productId])
 }
 
 model CancellationRequest {

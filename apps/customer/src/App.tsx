@@ -22,6 +22,7 @@ import { Updates } from "./pages/content/Updates";
 import { Contact } from "./pages/content/Contact";
 import { SearchPage } from "./pages/SearchPage";
 import { Policies } from "./pages/content/Policies";
+import { WishlistPage } from "./pages/WishlistPage";
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ function AppContent() {
           <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/cart" element={<Guard><CartPage /></Guard>} />
           <Route path="/checkout" element={<Guard><Checkout /></Guard>} />
+          <Route path="/wishlist" element={<WishlistPage />} />
           
           <Route path="/login" element={<AuthPage mode="login" />} />
           <Route path="/register" element={<AuthPage mode="register" />} />

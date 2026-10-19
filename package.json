@@ -12,7 +12,8 @@
     "db:seed": "npm run db:seed -w @shadow/backend",
     "db:studio": "npm run db:studio -w @shadow/backend",
     "db:validate": "npm run db:validate -w @shadow/backend",
-    "clear-demo": "tsx scripts/clear-demo.ts"
+    "clear-demo": "tsx scripts/clear-demo.ts",
+    "generate-snapshots": "tsx scripts/generate-snapshots.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

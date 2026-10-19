@@ -43,7 +43,23 @@ export function ProductDetail() {
         setIsWishlisted(false);
       }
     }
-  }, [data]);
+  }, [data?.product?.id]);
+
+  useEffect(() => {
+    if (!data?.product) return;
+    const handleStorage = () => {
+      try {
+        const list: string[] = JSON.parse(localStorage.getItem("shadow_wishlist") || "[]");
+        setIsWishlisted(list.includes(data.product.id));
+      } catch {}
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("shadow_wishlist_updated", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("shadow_wishlist_updated", handleStorage);
+    };
+  }, [data?.product?.id]);
 
   const toggleWishlist = () => {
     if (!data?.product) return;
@@ -58,6 +74,14 @@ export function ProductDetail() {
         setIsWishlisted(true);
       }
       localStorage.setItem("shadow_wishlist", JSON.stringify(next));
+      window.dispatchEvent(new Event("shadow_wishlist_updated"));
+
+      if (list.includes(data.product.id)) {
+        api(`/wishlist/items/${data.product.id}`, { method: "DELETE" }).catch(() => {});
+      } else {
+        api(`/wishlist/items`, { method: "POST", body: JSON.stringify({ productId: data.product.id }) }).catch(() => {});
+      }
+      queryClient.invalidateQueries({ queryKey: ["wishlist"] });
     } catch {
       setIsWishlisted(!isWishlisted);
     }
@@ -110,9 +134,26 @@ export function ProductDetail() {
         setImage(thumb ? resolveImageUrl(thumb) : "");
       }
     }
-  }, [color, data]);
+  }, [color, data?.product?.id]);
 
-  if (isLoading) return <Spinner/>; 
+  if (isLoading) return (
+    <section className="section page" style={{ paddingTop: "30px" }}>
+      <div className="product-detail">
+        {/* Skeleton gallery */}
+        <div className="gallery">
+          <div className="main-image" style={{ borderRadius: "var(--radius-xl)", overflow: "hidden", background: "var(--layer-2)", animation: "shimmer 1.8s infinite", minHeight: 480 }} />
+        </div>
+        {/* Skeleton copy */}
+        <div className="detail-copy" style={{ padding: "10px 0 60px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ height: 14, width: "60%", background: "var(--layer-2)", borderRadius: 6, animation: "shimmer 1.8s infinite" }} />
+          <div style={{ height: 48, width: "90%", background: "var(--layer-2)", borderRadius: 8, animation: "shimmer 1.8s infinite" }} />
+          <div style={{ height: 32, width: "40%", background: "var(--layer-2)", borderRadius: 6, animation: "shimmer 1.8s infinite" }} />
+          <div style={{ height: 80, width: "100%", background: "var(--layer-2)", borderRadius: 8, animation: "shimmer 1.8s infinite" }} />
+          <div style={{ height: 52, width: "100%", background: "var(--layer-2)", borderRadius: "var(--radius-pill)", animation: "shimmer 1.8s infinite" }} />
+        </div>
+      </div>
+    </section>
+  );
   if (error || !data) return <Status error={error}>{null}</Status>; 
   
   const p = data.product; 
@@ -446,25 +487,6 @@ export function ProductDetail() {
               </p>
             </details>
           </div>
-        </div>
-      </div>
-      
-      {/* Sticky Mobile Add to Cart Bar */}
-      <div className="mobile-sticky-bar">
-        <div>
-          <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "1px", color: "var(--muted)" }}>Price</div>
-          <strong style={{ fontSize: "17px", color: "var(--text)" }}>{money(effectivePrice)}</strong>
-        </div>
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button 
-            type="button"
-            className="button"
-            style={{ padding: "12px 20px", fontSize: "13px", background: "var(--gold)" }}
-            disabled={p.stock === 0 || buttonState === "loading"}
-            onClick={handleAddToCart}
-          >
-            {buttonState === "loading" ? "Adding..." : buttonState === "success" ? "Added ✓" : "Add to Bag"}
-          </button>
         </div>
       </div>
 

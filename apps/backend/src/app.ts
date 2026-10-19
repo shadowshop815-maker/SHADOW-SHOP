@@ -115,7 +115,6 @@ app.use(cors({
   origin: [
     env.CUSTOMER_URL, 
     env.ADMIN_URL, 
-    "https://shadowshop-82930.web.app", 
     "https://shadowshop-82930-admin.web.app",
     "https://shadow-shop-official-store.web.app",
     "http://localhost:3000",
@@ -142,11 +141,17 @@ app.use("/api/v1/webhooks", express.raw({ type: 'application/json' }), (req, _re
   next();
 });
 
-// Prevent caching of sensitive API responses (Financial/Auth data)
+// Prevent caching of sensitive API responses (Financial/Auth/Commerce data)
+// Public catalog and content endpoints set their own permissive Cache-Control headers.
+// Note: we use req.originalUrl (full URL) because req.path strips the /api prefix.
+const SENSITIVE_URL_PREFIXES = ["/api/v1/auth", "/api/v1/admin", "/api/v1/cart", "/api/v1/checkout", "/api/v1/orders", "/api/v1/returns", "/api/v1/commerce", "/api/v1/offers"];
 app.use("/api", (_req, res, next) => {
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
+  const isSensitive = SENSITIVE_URL_PREFIXES.some(p => _req.originalUrl.startsWith(p));
+  if (isSensitive) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
   next();
 });
 
@@ -173,5 +178,8 @@ app.use("/api/v1/admin/returns", rateLimit({ windowMs: 60_000, limit: 300, stand
 app.use("/api/v1/admin", rateLimit({ windowMs: 60_000, limit: 300, standardHeaders: "draft-7", legacyHeaders: false }), adminRouter);
 app.use("/api/v1/system", rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: "draft-7", legacyHeaders: false }), systemRouter);
 app.get("/health", async (_req, res) => { try { await prisma.$queryRaw`SELECT 1`; res.json({ success: true, service: "SHADOW SHOP API", database: "connected" }); } catch { res.status(503).json({ success: false, service: "SHADOW SHOP API", database: "disconnected" }); } });
+// Fast liveness check — returns immediately without DB ping.
+// Used by the frontend to detect Render cold starts without a 30s timeout.
+app.get("/readiness", (_req, res) => res.json({ success: true, status: "ready" }));
 app.use((_req, res) => res.status(404).json({ success: false, message: "Route not found.", error: { code: "NOT_FOUND" } }));
 app.use(errorHandler);

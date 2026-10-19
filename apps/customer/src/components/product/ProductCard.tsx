@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Heart, ShoppingBag, Check, ArrowRight } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, money, resolveImageUrl } from "../../api";
 import type { Product } from "../../types";
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({ product, priority = false }: { product: Product; priority?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isWishlisted, setIsWishlisted] = useState(() => {
@@ -16,6 +16,21 @@ export function ProductCard({ product }: { product: Product }) {
       return false;
     }
   });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const list = JSON.parse(localStorage.getItem("shadow_wishlist") || "[]");
+        setIsWishlisted(list.includes(product.id));
+      } catch {}
+    };
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("shadow_wishlist_updated", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("shadow_wishlist_updated", handleStorage);
+    };
+  }, [product.id]);
 
   const [addState, setAddState] = useState<"idle" | "adding" | "added">("idle");
 
@@ -33,6 +48,14 @@ export function ProductCard({ product }: { product: Product }) {
         setIsWishlisted(true);
       }
       localStorage.setItem("shadow_wishlist", JSON.stringify(next));
+      window.dispatchEvent(new Event("shadow_wishlist_updated"));
+      queryClient.invalidateQueries({ queryKey: ["wishlist"] });
+
+      if (list.includes(product.id)) {
+        api(`/wishlist/items/${product.id}`, { method: "DELETE" }).catch(() => {});
+      } else {
+        api(`/wishlist/items`, { method: "POST", body: JSON.stringify({ productId: product.id }) }).catch(() => {});
+      }
     } catch {
       setIsWishlisted(!isWishlisted);
     }
@@ -93,7 +116,8 @@ export function ProductCard({ product }: { product: Product }) {
             src={primaryImage}
             alt={product.name}
             className={`product-image-primary ${secondaryImage ? "has-secondary" : ""}`}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
           />
           {secondaryImage && (
             <img

@@ -7,13 +7,10 @@
     "shadowshop-82930": {
       "hosting": {
         "customer": [
-          "shadowshop-82930"
+          "shadow-shop-official-store"
         ],
         "admin": [
           "shadowshop-82930-admin"
-        ],
-        "shop": [
-          "shadow-shop-official-store"
         ]
       }
     }

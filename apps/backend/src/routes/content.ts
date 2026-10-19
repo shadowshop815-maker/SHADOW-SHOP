@@ -11,6 +11,8 @@ contentRouter.get("/settings", asyncHandler(async (_req, res) => {
   if (!store) store = await prisma.storeSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
   if (!branding) branding = await prisma.brandingSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
   if (!location) location = await prisma.locationSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  // Settings are public, non-sensitive — allow CDN and browser caching
+  res.setHeader("Cache-Control", "public, max-age=120, s-maxage=300, stale-while-revalidate=86400");
   return success(res, "Store settings loaded.", { store, branding, location });
 }));
 contentRouter.get("/updates", asyncHandler(async (req, res) => success(res, "Updates loaded.", await prisma.updatePost.findMany({ where: { status: "PUBLISHED", ...(req.query.search ? { OR: [{ title: { contains: String(req.query.search) } }, { description: { contains: String(req.query.search) } }] } : {}) }, orderBy: { publishDate: "desc" } }))));
