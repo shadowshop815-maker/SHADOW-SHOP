@@ -330,8 +330,8 @@ export async function fetchReviewEligibility(slug: string, user: User | null): P
   }
 
   return {
-    canReview: true,
-    isDeliveredBuyer: true,
+    canReview: false,
+    isDeliveredBuyer: false,
     hasExistingReview: false,
     existingReview: null,
   };
@@ -360,7 +360,15 @@ export async function submitRealReview(
       method: "POST",
       body: JSON.stringify(data),
     });
-  } catch (e) {
+  } catch (e: any) {
+    if (
+      e?.status === 403 ||
+      e?.code === "DELIVERY_REQUIRED" ||
+      e?.message?.includes("verified buyers") ||
+      e?.message?.includes("received this product")
+    ) {
+      throw new Error(e.message || "Only verified buyers who have received this product can submit a review.");
+    }
     console.warn("Backend review endpoint unreachable; recording to real persistent store", e);
   }
 

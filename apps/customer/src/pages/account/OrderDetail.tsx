@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, MapPin, Printer, ArrowLeft, Calendar, Clock, Truck, ShieldCheck, Package, AlertCircle } from "lucide-react";
+import { Check, MapPin, Printer, ArrowLeft, Calendar, Clock, Truck, ShieldCheck, Package, AlertCircle, Star } from "lucide-react";
 import { api, money, resolveImageUrl } from "../../api";
 import type { Order } from "../../types";
 import { Spinner, Status } from "../../components/ui";
@@ -239,7 +239,30 @@ export function OrderDetail() {
                         Qty: {i.quantity}
                       </span>
                     </div>
-                    <ReturnItemButton order={order} item={i} />
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: "6px" }}>
+                      <ReturnItemButton order={order} item={i} />
+                      {order.orderStatus === "DELIVERED" && (
+                        <Link
+                          to={`/products/${i.productId}#customer-reviews`}
+                          className="outline-button"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            borderRadius: "6px",
+                            color: "var(--gold)",
+                            borderColor: "var(--gold)",
+                            fontWeight: 700,
+                            textDecoration: "none",
+                          }}
+                        >
+                          <Star size={13} fill="currentColor" />
+                          <span>Rate &amp; Review</span>
+                        </Link>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ textAlign: "right" }}>

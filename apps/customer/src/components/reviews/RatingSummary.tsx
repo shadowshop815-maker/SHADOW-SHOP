@@ -61,6 +61,16 @@ export function RatingSummary({ summary, eligibility, onOpenReviewModal }: Ratin
                 </>
               )}
             </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px", fontSize: "11.5px", color: eligibility?.canReview ? "#059669" : "var(--muted)" }}>
+              {eligibility?.canReview ? (
+                <>
+                  <CheckCircle2 size={13} color="#059669" />
+                  <span style={{ fontWeight: 600 }}>Verified Purchase · Delivered</span>
+                </>
+              ) : (
+                <span>🛡️ Ratings unlock automatically after delivery</span>
+              )}
+            </div>
           </div>
         </div>
 

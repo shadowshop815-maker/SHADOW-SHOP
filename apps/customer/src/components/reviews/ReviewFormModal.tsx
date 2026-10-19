@@ -143,6 +143,12 @@ export function ReviewFormModal({
         }
       }
 
+      if (!auth.user) {
+        setErrorMsg("Please sign in with your buyer account to submit a review.");
+        setLoading(false);
+        return;
+      }
+
       const allImageUrls = [...existingImages, ...uploadedUrls];
 
       // 2. Submit or update review via real persistent review service
@@ -158,13 +164,7 @@ export function ReviewFormModal({
           fabricQuality,
           comfort,
         },
-        auth.user || {
-          id: "cust_" + Math.random().toString(36).substring(2, 9),
-          email: "customer@shadowshop.example",
-          phone: null,
-          role: "CUSTOMER",
-          name: "Verified Buyer"
-        }
+        auth.user
       );
 
       setSuccessMsg(isEditing ? "Review updated successfully!" : "Review published successfully! Thank you for sharing your experience.");
